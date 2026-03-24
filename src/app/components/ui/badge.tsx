@@ -25,7 +25,7 @@ const badgeVariants = cva(
   },
 );
 
-function Badge({
+function Badge1({
   className,
   variant,
   asChild = false,
@@ -42,5 +42,19 @@ function Badge({
     />
   );
 }
+
+const Badge = ({ children, variant = "neutral", className = "" }: { children: React.ReactNode, variant?: "neutral" | "success" | "warning" | "danger", className?: string }) => {
+  const styles = {
+    neutral: "bg-slate-100 text-slate-600",
+    success: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    warning: "bg-amber-50 text-amber-700 border border-amber-200",
+    danger: "bg-rose-50 text-rose-700 border border-rose-200"
+  };
+  return (
+    <span className={`px-2.5 py-0.5 text-[11px] font-bold border rounded-full ${styles[variant]} ${className}`}>
+      {children}
+    </span>
+  );
+};
 
 export { Badge, badgeVariants };

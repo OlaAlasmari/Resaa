@@ -125,8 +125,7 @@
   }
 
   body {
-      font-family: 'Lemonada', cursive;
-
+  
     @apply bg-background text-foreground;
   }
 

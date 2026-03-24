@@ -34,7 +34,46 @@ const buttonVariants = cva(
   },
 );
 
-function Button({
+const Button = ({ 
+  children, 
+  variant = "primary", 
+  className = "", 
+  fullWidth = false,
+  onClick,
+  icon: Icon,
+  disabled = false
+}: { 
+  children: React.ReactNode; 
+  variant?: "primary" | "secondary" | "outline" | "danger" | "ghost"; 
+  className?: string;
+  fullWidth?: boolean;
+  onClick?: () => void;
+  icon?: any;
+  disabled?: boolean;
+}) => {
+  const baseStyles = "inline-flex items-center justify-center gap-2 px-5 py-2.5 font-bold transition-all duration-200 rounded-md text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed";
+  
+  const variants = {
+    primary: `${THEME.primary} text-white ${THEME.primaryHover} shadow-sm`,
+    secondary: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm",
+    outline: `bg-transparent text-[#30364F] border ${THEME.border} hover:border-[#30364F] hover:text-[#30364F]`,
+    danger: "bg-white text-red-600 border border-red-200 hover:bg-red-50",
+    ghost: "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-[#30364F]",
+  };
+
+  return (
+    <button 
+      onClick={onClick}
+      disabled={disabled}
+      className={`${baseStyles} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${className}`}
+    >
+      {Icon && <Icon className="w-4 h-4" />}
+      {children}
+    </button>
+  );
+};
+
+function Button1({
   className,
   variant,
   size,
@@ -54,5 +93,19 @@ function Button({
     />
   );
 }
+const THEME = {
+  primary: "bg-[#91C6BC]", // Teal/Mint Green for buttons
+  primaryHover: "hover:bg-[#7BB5AA]", // Darker Teal for hover
+  textPrimary: "text-[#30364F]", 
+  textSecondary: "text-[#475569]", // Slate 600
+  bgLight: "bg-[#f1f5f9]", // Slate 100
+  border: "border-[#cbd5e1]", // Slate 300
+  accent: "bg-[#334155]", // Slate 700
+  accentText: "text-[#f8fafc]",
+  secondary: "bg-[#B7E5CD]", // Light Blue-Green
+  secondaryText: "text-[#B7E5CD]",
+  navbarBg: "bg-[#30364F]", // Deep Blue for navbar
+  footerBg: "bg-[#30364F]" // Deep Blue for footer
+};
 
 export { Button, buttonVariants };
