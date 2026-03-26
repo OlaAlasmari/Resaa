@@ -29,6 +29,9 @@ import {
   CardAction,
 } from "./components/ui/card";
 import { Badge } from "./components/ui/badge";
+import Homepage from "./components/pages/Homepage";
+import AuctionsPage from "./components/pages/AuctionsPage";
+import ListingAuctionCard from "./components/ListingAuctionCard";
 
 
 // --- Types ---
@@ -665,7 +668,6 @@ const LoginRequiredModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onC
 };
 
 // --- Navbar ---
-
 const Navbar = ({ 
   onNavigate, 
   currentView, 
@@ -699,6 +701,7 @@ const Navbar = ({
           <span className="text-[10px] font-bold uppercase tracking-widest text-[#91C6BC]">منصة المزادات</span>
         </div>
       </div>
+      
 
       {/* Navigation - CENTER */}
       <div className="hidden md:flex flex-1 justify-start items-center gap-15 -translate-x-30">
@@ -766,244 +769,41 @@ const Navbar = ({
       </div>
 
     </div>
+    {currentView === "home" && (
+      <Homepage
+        navigate={onNavigate}
+        isFavorite={() => false}
+        toggleFavorite={() => {}}
+      />
+    )}
+
+   {currentView === "auction-browse" && (
+  <AuctionsPage
+    navigate={onNavigate}
+    isFavorite={() => false}
+    toggleFavorite={() => {}}
+  />
+)}
   </nav>
+
 );
+
+
+
+
+
+
 
 // --- Horizontal Filter Bar ---
 
-const HorizontalFilterBar = () => {
-  const [filterType, setFilterType] = useState('current');
 
-  return (
-    <div className={`bg-white border-b ${THEME.border} sticky top-20 z-40 shadow-sm py-4`}>
-       <div className="max-w-7xl mx-auto px-4 md:px-8 space-y-4">
-          <div className="flex flex-col md:flex-row items-center gap-4">
-             {/* Filter Title */}
-             <div className={`flex items-center gap-2 ${THEME.textPrimary} font-bold shrink-0`}>
-                <Filter className="w-5 h-5" />
-                <span>تصفية النتائج</span>
-             </div>
-
-             {/* Separator */}
-             <div className="hidden md:block w-px h-8 bg-slate-200" />
-
-             {/* Filter Groups - Hidden Scrollbar */}
-             <div className="flex flex-1 gap-4 overflow-x-auto w-full pb-2 md:pb-0 no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                <style>{`
-                  .no-scrollbar::-webkit-scrollbar {
-                    display: none;
-                  }
-                `}</style>
-               
-                <div className="min-w-[160px]">
-                   <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">نوع العقار</label>
-                   <select className={`w-full text-sm border-slate-300 rounded-md focus:ring-[#30364F] focus:border-[#30364F]`}>
-                     <option>الكل</option>
-                     <option>أرض سكنية</option>
-                     <option>أرض تجارية</option>
-                     <option>عمارة</option>
-                   </select>
-                </div>
-
-                <div className="min-w-[160px]">
-                   <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">المدينة</label>
-                   <select className={`w-full text-sm border-slate-300 rounded-md focus:ring-[#30364F] focus:border-[#30364F]`}>
-                     <option>الكل</option>
-                     <option>الرياض</option>
-                     <option>جدة</option>
-                     <option>الدمام</option>
-                   </select>
-                </div>
-
-                <div className="flex gap-2 items-end max-w-[250px]">
-                   <div className="flex-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">السعر من</label>
-                      <input type="number" min="0" placeholder="0" className={`w-full text-sm border-slate-300 rounded-md focus:ring-[#30364F] focus:border-[#30364F]`} />
-                   </div>
-                   <div className="flex-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">السعر إلى</label>
-                      <input type="number" min="0" placeholder="غير محدود" className={`w-full text-sm border-slate-300 rounded-md focus:ring-[#30364F] focus:border-[#30364F]`} />
-                   </div>
-                </div>
-
-             </div>
-
-             <Button variant="primary" className="shrink-0">تطبيق</Button>
-
-          </div>
-
-          {/* Bottom Row: Tabs */}
-          <div className="flex justify-center pt-2">
-             <div className="inline-flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-                {[
-                   { id: 'current', label: 'المزادات الحالية' },
-                   { id: 'upcoming', label: 'المزادات القادمة' },
-                   { id: 'ended', label: 'المزادات المنتهية' }
-                ].map((tab) => (
-                   <button 
-                      key={tab.id}
-                      onClick={() => setFilterType(tab.id)}
-                      className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                         filterType === tab.id 
-                         ? 'bg-white text-[#30364F] shadow-sm ring-1 ring-slate-200' 
-                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
-                      }`}
-                   >
-                      {tab.label}
-                   </button>
-                ))}
-             </div>
-          </div>
-       </div>
-    </div>
-  );
-};
 
 // --- Component: Asset Reference Card (Listing) ---
 
-const ListingAuctionCard = ({ 
-  id,
-  title, 
-  location, 
-  days, 
-  hours, 
-  minutes, 
-  seconds,
-  onClick,
-  isFavorite,
-  onToggleFavorite,
-  image
-}: { 
-  id: string,
-  title: string, 
-  location: string, 
-  days: string, 
-  hours: string, 
-  minutes: string, 
-  seconds: string,
-  onClick: () => void,
-  isFavorite: boolean,
-  onToggleFavorite: (e: React.MouseEvent) => void,
-  image?: string
-}) => (
-  <div className={`bg-[#f8fafc] rounded-xl overflow-hidden shadow-sm border ${THEME.border} group cursor-pointer`} onClick={onClick}>
-     {/* Image Area */}
-     <div className="relative h-48 bg-slate-200">
-        <ImageWithFallback src={image || ASSETS.heroBg} className="w-full h-full object-cover" alt={title} />
-        <button 
-           onClick={onToggleFavorite}
-           className={`absolute top-4 left-4 p-2 rounded-full transition-colors ${isFavorite ? 'bg-red-500 text-white' : 'bg-white/90 text-slate-400 hover:text-red-500'}`}
-        >
-           <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-        </button>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center text-white drop-shadow-md w-full px-4">
-           <h3 className="text-2xl font-black mb-1">{title}</h3>
-           <p className="text-sm font-bold opacity-90">{location}</p>
-        </div>
-     </div>
 
-     {/* Countdown Section */}
-     <div className="bg-[#f0fdf4] border-b border-slate-100 py-3 px-4">
-        <div className="text-center text-[10px] text-emerald-700 font-bold uppercase mb-2">جاري ينتهي بعد</div>
-        <div className="flex justify-between text-center dir-ltr">
-           {[
-              { val: days, label: "يوم" },
-              { val: hours, label: "ساعة" },
-              { val: minutes, label: "دقيقة" },
-              { val: seconds, label: "ثانية" }
-           ].map((t, i) => (
-              <div key={i} className="flex-1 border-r last:border-0 border-emerald-100">
-                 <div className="font-black text-lg text-slate-800 leading-none">{t.val}</div>
-                 <div className="text-[10px] text-slate-500">{t.label}</div>
-              </div>
-           ))}
-        </div>
-     </div>
-
-     {/* Info Stats */}
-     <div className="bg-white p-4 grid grid-cols-2 gap-4 text-sm">
-        <div className="flex items-center gap-2 justify-center">
-           <Clock className="w-4 h-4 text-slate-500" />
-           <span className="font-bold text-slate-700">المدة 3 أيام</span>
-        </div>
-        <div className="flex items-center gap-2 justify-center">
-           <LayoutDashboard className="w-4 h-4 text-slate-500" />
-           <span className="font-bold text-slate-700">3 منتجات</span>
-        </div>
-        <div className="col-span-2 flex items-center justify-center gap-3 border-t border-dotted border-slate-200 pt-3 mt-1 text-sm">
-           <Calendar className="w-4 h-4 text-slate-500" />
-           <span className="font-bold text-slate-800">2026/02/02</span>
-           <span className="text-slate-300">|</span>
-           <span className="font-bold text-slate-800">07:00 م</span>
-        </div>
-     </div>
-
-     {/* Footer Button */}
-     <div className="p-4 flex justify-between items-center bg-slate-50 border-t border-slate-100">
-        <Button variant="primary" className="!w-32 !py-2 !rounded-md shadow-none hover:shadow-md">التفاصيل</Button>
-        <div className="flex items-center gap-2 opacity-80">
-           <div className="text-right">
-              <div className="text-[10px] font-bold text-slate-400">منصة</div>
-              <div className="font-black text-[#30364F] leading-none text-lg">رســاء</div>
-           </div>
-           <Gavel className="w-6 h-6 text-[#30364F]" />
-        </div>
-     </div>
-  </div>
-);
 
 // --- Component: Vision Mission (New) ---
-const VisionMissionSection = () => {
-   return (
-      <section className="bg-white border-b border-slate-200 py-16 px-4">
-         <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-start">
-            <div className="space-y-6 flex flex-col">
-               <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-100 text-[#30364F] rounded-full text-xs font-bold">
-                  <Globe className="w-4 h-4" /> رؤية 2030
-               </div>
-               <h2 className="text-4xl font-black leading-tight text-[#30364F]">نصنع مستقبل المزادات العقارية بذكاء وشفافية</h2>
-               <p className="text-lg text-slate-500 leading-relaxed">
-                  نسعى لتمكين المستثمرين والأفراد من الوصول إلى الفرص العقارية الموثوقة من خلال منصة رقمية متكاملة مدعومة بأحدث تقنيات الذكاء الاصطناعي، لضمان عدالة التقييم وسهولة المشاركة.
-               </p>
-               
-               <div className="space-y-4 pt-4">
-                  {[
-                     { title: "الريادة والابتكار", desc: "توظيف التكنولوجيا لخدمة القطاع العقاري" },
-                     { title: "الشفافية المطلقة", desc: "جميع العمليات موثقة وواضحة للجميع" },
-                     { title: "الكفاءة العالية", desc: "تجربة مستخدم سلسة من التسجيل حتى الإفراغ" }
-                  ].map((item, i) => (
-                     <motion.div 
-                        key={i} 
-                        initial={{ opacity: 0, y: 10 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        className="flex gap-4 p-4 rounded-xl border border-slate-100 hover:border-[#30364F]/20 hover:bg-slate-50 transition-colors cursor-default group"
-                     >
-                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-[#30364F] group-hover:bg-[#30364F] group-hover:text-white transition-colors shrink-0">
-                           <Target className="w-6 h-6" />
-                        </div>
-                        <div>
-                           <h4 className="font-bold text-[#30364F]">{item.title}</h4>
-                           <p className="text-sm text-slate-500">{item.desc}</p>
-                        </div>
-                     </motion.div>
-                  ))}
-               </div>
-            </div>
-            
-            <div className="relative bg-slate-100 rounded-2xl overflow-hidden h-[650px]">
-               <img src="https://images.unsplash.com/photo-1722966885396-1f3dcebdf27f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxyaXlhZGglMjBza3lsaW5lJTIwc2t5c2NyYXBlcnMlMjBzYXVkaSUyMGFyYWJpYXxlbnwxfHx8fDE3NzE5NzMyNjB8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral" className="w-full h-full object-cover" alt="ناطحات السحاب في السعودية" />
-               <div className="absolute inset-0 bg-gradient-to-t from-[#30364F] via-transparent to-transparent opacity-80"></div>
-               <div className="absolute bottom-8 right-8 text-white max-w-sm">
-                  <div className="text-5xl font-black mb-2 opacity-20">01</div>
-                  <h3 className="text-2xl font-bold mb-2">مهمتنا</h3>
-                  <p className="text-slate-300 text-sm">توفير بيئة مزادات آمنة ومحفزة تضمن حقوق جميع الأطراف وتساهم في تنمية القطاع العقاري.</p>
-               </div>
-            </div>
-         </div>
-      </section>
-   );
-};
+
 
 
 // --- Detail View ---
@@ -1940,79 +1740,9 @@ export default function App() {
 
        <main className="flex-1">
           <AnimatePresence mode="wait">
-             {currentView === 'home' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                   
-                   {/* Hero Section */}
-                   <section className="relative bg-[#30364F] text-white py-24 px-4 overflow-hidden">
-                      <div className="absolute inset-0 opacity-30">
-                         <video 
-                            autoPlay 
-                            loop 
-                            muted 
-                            playsInline 
-                            className="w-full h-full object-cover"
-                         >
-                            <source src="https://www.shutterstock.com/shutterstock/videos/3807496161/preview/stock-footage-jeddah-saudi-arabia-jun-aerial-view-of-jeddah-islamic-port-largest-sea-port-on-red-sea.webm" type="video/webm" />
-                            <ImageWithFallback src={ASSETS.heroBg} className="w-full h-full object-cover" alt="BG" />
-                         </video>
-                      </div>
-                      <div className="max-w-4xl mx-auto relative z-10 text-center space-y-6">
-                         <h1 className="text-5xl font-black">منصة رساء للمزادات</h1>
-                         <p className="text-xl text-slate-300">المنصة الرسمية الموحدة للمزادات العقارية</p>
-                         <div className="flex justify-center gap-4">
-                            <Button onClick={() => navigate('auction-browse')} variant="primary" className="!bg-slate-700 !px-8 !py-3">تصفح المزادات</Button>
-                         </div>
-                      </div>
-                   </section>
+//delete home page
 
-                   {/* Vision & Mission */}
-                   <VisionMissionSection />
-
-                   <section className="max-w-7xl mx-auto px-4 py-16">
-                      <div className="flex justify-between items-center mb-8">
-                         <h2 className="text-2xl font-black">أحدث الفرص الاستثمارية</h2>
-                         <Button variant="ghost" onClick={() => navigate('auction-browse')}>عرض الكل</Button>
-                      </div>
-                      <div className="grid md:grid-cols-3 gap-6">
-                         {[1, 2, 3].map((i) => (
-                             <ListingAuctionCard 
-                                key={i}
-                                id={`featured-${i}`}
-                                title={i === 1 ? "مزاد البركة" : i === 2 ? "مزاد أريج الباحة" : "مزاد الباحة"}
-                                location="مكة المكرمة - العاصمة المقدسة" 
-                                days="01" hours="20" minutes="28" seconds="09" 
-                                onClick={() => navigate('auction-detail')}
-                                isFavorite={isFavorite(`featured-${i}`)}
-                                onToggleFavorite={(e) => { e.stopPropagation(); toggleFavorite(`featured-${i}`); }}
-                                image={i === 1 ? ASSETS.villa : i === 2 ? ASSETS.residential : ASSETS.commercialBuilding}
-                             />
-                         ))}
-                      </div>
-                   </section>
-                </motion.div>
-             )}
-
-             {currentView === 'auction-browse' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                   <HorizontalFilterBar />
-                   <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {[1, 2, 3, 4, 5, 6].map((i) => (
-                         <ListingAuctionCard 
-                            key={i}
-                            id={`browse-${i}`}
-                            title={`مزاد الفرصة رقم ${i}`} 
-                            location="الرياض - شمال الرياض" 
-                            days="03" hours="12" minutes="00" seconds="45" 
-                            onClick={() => navigate('auction-detail')}
-                            isFavorite={isFavorite(`browse-${i}`)}
-                            onToggleFavorite={(e) => { e.stopPropagation(); toggleFavorite(`browse-${i}`); }}
-                            image={[ASSETS.villa, ASSETS.residential, ASSETS.commercialBuilding, ASSETS.landPlot, ASSETS.villa, ASSETS.residential][i - 1]}
-                         />
-                      ))}
-                   </div>
-                </motion.div>
-             )}
+             
 
              {currentView === 'favorites' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
