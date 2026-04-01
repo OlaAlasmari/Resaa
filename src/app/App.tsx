@@ -41,6 +41,8 @@ import ProfilePage from "./components/pages/ProfilePage";
 import BidHistoryPage from "./components/pages/BidHistoryPage";
 import SupportPage from "./components/pages/SupportPage";
 import WalletPage from "./components/pages/WalletPage";
+import LiveBiddingPage from "./components/pages/LiveBiddingPage";
+import ParticipationModal from "./components/ParticipationModal";
 import ListingAuctionCard from "./components/ListingAuctionCard";
 
 
@@ -310,80 +312,6 @@ const Navbar = ({
 
 // --- Live Bidding Room ---
 
-const LiveBiddingRoom = ({ onExit }: { onExit: () => void }) => {
-   const [currentBid, setCurrentBid] = useState(2350000);
-   return (
-      <div className="min-h-screen bg-[#f8fafc] text-[#30364F] pb-20">
-         <div className="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-            <div className="flex items-center gap-3">
-               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-               <span className="font-bold">مزاد مباشر: فيلا القيروان</span>
-            </div>
-            <Button variant="outline" className="hover:bg-red-50 hover:border-red-200 hover:text-red-600" onClick={onExit}>خروج</Button>
-         </div>
-         <div className="max-w-6xl mx-auto p-6 grid md:grid-cols-12 gap-6">
-            <div className="md:col-span-8 space-y-6">
-               <div className="aspect-[16/7] bg-black rounded-xl overflow-hidden relative shadow-lg">
-                  <ImageWithFallback src={ASSETS.heroBg} className="w-full h-full object-cover opacity-90" alt="Live" />
-                  <div className="absolute bottom-6 right-6">
-                     <div className="text-sm text-slate-100 mb-1 font-bold shadow-black drop-shadow-md">السعر الحالي</div>
-                     <div className="text-5xl font-black text-white drop-shadow-lg">{currentBid.toLocaleString()} ر.س</div>
-                  </div>
-               </div>
-
-               {/* Live AI Assistant (For Participating Bidders) - Updated to Light Theme inside */}
-               <div className="bg-white rounded-xl p-6 border border-emerald-100 relative overflow-hidden shadow-md">
-                  <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
-                     <BarChart3 className="w-24 h-24 text-[#30364F]" />
-                  </div>
-                  <div className="relative z-10">
-                     <div className="flex items-center gap-2 mb-4 text-[#30364F] font-bold">
-                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                        <span>تحليل العقار للمزايدة</span>
-                     </div>
-                     <div className="grid grid-cols-2 gap-8 mb-4">
-                        <div>
-                           <div className="text-xs text-slate-500 mb-1 font-bold">الحد الأقصى المقترح للمزايدة</div>
-                           <div className="text-3xl font-black text-[#30364F]">2,450,000 ر.س</div>
-                        </div>
-                        <div>
-                           <div className="text-xs text-slate-500 mb-1 font-bold">حالة السعر</div>
-                           <div className="text-lg font-bold text-emerald-600">مناسب للشراء</div>
-                        </div>
-                     </div>
-                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
-                        <div className="h-full bg-gradient-to-l from-emerald-500 to-emerald-700 w-[85%] transition-all duration-500"></div>
-                     </div>
-                     <p className="text-sm text-slate-500 flex items-start gap-2">
-                        <Info className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
-                        <span>السعر الحالي يقترب من القيمة العادلة. ننصح بزيادات حذرة لا تتجاوز 10,000 ر.س في المرة الواحدة.</span>
-                     </p>
-                  </div>
-               </div>
-            </div>
-
-            <div className="md:col-span-4 bg-white rounded-xl border border-slate-200 p-4 flex flex-col h-[600px] shadow-sm">
-               <div className="flex-1 space-y-2 overflow-y-auto mb-4 pr-1">
-                  {[1, 2, 3, 4, 5, 6].map(i => (
-                     <div key={i} className="flex justify-between text-sm p-3 bg-slate-50 rounded border border-slate-100">
-                        <span className="font-bold text-slate-600">مزايد {i}02</span>
-                        <span className="font-mono font-bold text-[#30364F]">{(currentBid - (i * 10000)).toLocaleString()}</span>
-                     </div>
-                  ))}
-               </div>
-               <div className="space-y-3 pt-4 border-t border-slate-100">
-                  <div className="grid grid-cols-3 gap-2">
-                     <button onClick={() => setCurrentBid(c => c + 5000)} className="py-2 bg-white border border-slate-200 text-[#30364F] rounded text-xs font-bold hover:bg-slate-50">+ 5k</button>
-                     <button onClick={() => setCurrentBid(c => c + 10000)} className="py-2 bg-white border border-slate-200 text-[#30364F] rounded text-xs font-bold hover:bg-slate-50">+ 10k</button>
-                     <button onClick={() => setCurrentBid(c => c + 50000)} className="py-2 bg-white border border-slate-200 text-[#30364F] rounded text-xs font-bold hover:bg-slate-50">+ 50k</button>
-                  </div>
-                  <Button fullWidth className="!bg-emerald-600 hover:!bg-emerald-500 text-lg shadow-lg shadow-emerald-200">مزايدة</Button>
-               </div>
-            </div>
-         </div>
-      </div>
-   );
-};
 
 // --- Modals ---
 
@@ -419,143 +347,6 @@ const WalletModal = ({ balance, onClose, onRecharge }: { balance: number, onClos
    );
 };
 
-const ParticipationModal = ({ isOpen, onClose, onConfirm, walletBalance }: { isOpen: boolean, onClose: () => void, onConfirm: () => void, walletBalance: number }) => {
-   const [role, setRole] = useState<ParticipationRole>(null);
-   const [agreed, setAgreed] = useState(false);
-
-   // Agent Fields
-   const [agencyNumber, setAgencyNumber] = useState("");
-   const [agencyDate, setAgencyDate] = useState("");
-   const [agentConfirmed, setAgentConfirmed] = useState(false);
-
-   // Payment Step
-   const [step, setStep] = useState<1 | 2>(1); // 1: Info, 2: Payment
-   const depositAmount = 5000;
-
-   if (!isOpen) return null;
-
-   const handleNext = () => {
-      // All roles now require deposit step
-      setStep(2);
-   };
-
-   return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-         <Card className={`w-full ${role === 'agent' && step === 1 ? 'max-w-md' : 'max-w-lg'} shadow-2xl`} title={step === 1 ? "طلب المشاركة في المزاد" : "دفع العربون"}>
-            {step === 1 ? (
-               <div className="space-y-6">
-                  <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-3">اختر صفة المشاركة</label>
-                     <div className="grid grid-cols-2 gap-4">
-                        <button
-                           onClick={() => setRole('principal')}
-                           className={`p-4 border-2 rounded-xl text-center transition-all ${role === 'principal' ? 'border-[#30364F] bg-slate-50 text-[#30364F]' : 'border-slate-200 hover:border-slate-300'}`}
-                        >
-                           <User className="w-8 h-8 mx-auto mb-2 opacity-80" />
-                           <div className="font-bold">أصيل</div>
-                        </button>
-                        <button
-                           onClick={() => setRole('agent')}
-                           className={`p-4 border-2 rounded-xl text-center transition-all ${role === 'agent' ? 'border-[#30364F] bg-slate-50 text-[#30364F]' : 'border-slate-200 hover:border-slate-300'}`}
-                        >
-                           <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-80" />
-                           <div className="font-bold">وكيل</div>
-                        </button>
-                     </div>
-                  </div>
-
-                  {/* Agent Validation Fields */}
-                  {role === 'agent' && (
-                     <div className="bg-slate-50 p-4 rounded-lg space-y-4 border border-slate-100 animate-in slide-in-from-top-2">
-                        <InputField
-                           label="رقم الوكالة"
-                           placeholder="xxxxxxxx"
-                           value={agencyNumber}
-                           onChange={(e) => setAgencyNumber(e.target.value)}
-                        />
-                        <InputField
-                           label="تاريخ الوكالة"
-                           placeholder=""
-                           type="date"
-                           value={agencyDate}
-                           onChange={(e) => setAgencyDate(e.target.value)}
-                        />
-                        <label className="flex items-center gap-2 cursor-pointer pt-2">
-                           <input type="checkbox" checked={agentConfirmed} onChange={(e) => setAgentConfirmed(e.target.checked)} />
-                           <span className="text-xs font-bold text-slate-600">أقر بصحة البيانات المدخلة وسريان مفعول الوكالة</span>
-                        </label>
-                     </div>
-                  )}
-
-                  <div className="space-y-3 pt-4 border-t border-slate-100">
-                     <label className="flex items-start gap-3 cursor-pointer group">
-                        <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-1 rounded border-slate-300 text-[#30364F] focus:ring-[#30364F]" />
-                        <span className="text-sm text-slate-600 group-hover:text-slate-900">أقر بأنني اطلعت على كراسة الشروط والأحكام الخاصة بالمزاد وأوافق عليها بالكامل.</span>
-                     </label>
-                  </div>
-
-                  <div className="flex gap-3 pt-2">
-                     <Button fullWidth variant="secondary" onClick={onClose}>إلغاء</Button>
-                     <Button
-                        fullWidth
-                        disabled={!role || !agreed || (role === 'agent' && (!agencyNumber || !agencyDate || !agentConfirmed))}
-                        onClick={handleNext}
-                        variant="primary"
-                     >
-                        التالي: دفع العربون
-                     </Button>
-                  </div>
-               </div>
-            ) : (
-               // Step 2: Deposit Payment
-               <div className="space-y-6">
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex items-start gap-3">
-                     <Info className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-                     <p className="text-sm text-blue-800">
-                        لضمان الجدية، يلزم دفع عربون دخول المزاد بقيمة <strong className="font-black text-lg mx-1">{depositAmount.toLocaleString()} ر.س</strong>
-                        <br />
-                        سيتم خصم المبلغ مباشرة من محفظتك الإلكترونية.
-                     </p>
-                  </div>
-
-                  <div className="p-4 border rounded-lg bg-slate-50">
-                     <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-bold text-slate-500">رصيد المحفظة الحالي</span>
-                        <span className={`font-black ${walletBalance >= depositAmount ? 'text-[#30364F]' : 'text-red-600'}`}>
-                           {walletBalance.toLocaleString()} ر.س
-                        </span>
-                     </div>
-                     <div className="flex justify-between items-center pt-2 border-t border-slate-200">
-                        <span className="text-sm font-bold text-slate-500">مبلغ العربون</span>
-                        <span className="font-black text-red-600">-{depositAmount.toLocaleString()} ر.س</span>
-                     </div>
-                  </div>
-
-                  {walletBalance < depositAmount && (
-                     <div className="flex items-center gap-2 text-red-600 text-sm font-bold bg-red-50 p-3 rounded border border-red-100">
-                        <AlertTriangle className="w-4 h-4" />
-                        <span>رصيد المحفظة غير كافٍ. يرجى إضافة عربون أولاً.</span>
-                     </div>
-                  )}
-
-                  <div className="flex gap-3 pt-2">
-                     <Button fullWidth variant="secondary" onClick={() => setStep(1)}>رجوع</Button>
-                     <Button
-                        fullWidth
-                        onClick={onConfirm}
-                        variant="primary"
-                        icon={Lock}
-                        disabled={walletBalance < depositAmount}
-                     >
-                        دفع العربون وتأكيد المشاركة
-                     </Button>
-                  </div>
-               </div>
-            )}
-         </Card>
-      </div>
-   );
-};
 
 // --- Footer ---
 
@@ -777,12 +568,13 @@ export default function App() {
                   </motion.div>
                )}
 
-               {currentView === 'live-bidding' && (
-                  <LiveBiddingRoom onExit={() => {
-                     // استرجاع العربون إلى المحفظة الإلكترونية
-                     setWalletBalance(b => b + 5000);
-                     navigate('home');
-                  }} />
+               {currentView === "live-bidding" && (
+                  <LiveBiddingPage
+                     onExit={() => {
+                        setWalletBalance((b) => b + 5000);
+                        navigate("home");
+                     }}
+                  />
                )}
 
                {currentView === "wallet" && (
