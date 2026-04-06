@@ -2,19 +2,20 @@ import React from "react";
 import AuthView from "../AuthView";
 
 type LoginPageProps = {
-  onLogin: () => void;
+  onLoginSubmit: (data: { nationalId: string; password: string }) => void | Promise<void>;
   onGoToRegister: () => void;
 };
 
 export default function LoginPage({
-  onLogin,
+  onLoginSubmit,
   onGoToRegister,
 }: LoginPageProps) {
   return (
     <AuthView
       isRegister={false}
       onToggle={onGoToRegister}
-      onLogin={onLogin}
+      onLoginSubmit={onLoginSubmit}
+      onRegisterSubmit={async () => {}}
     />
   );
 }

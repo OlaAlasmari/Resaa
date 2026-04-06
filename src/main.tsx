@@ -1,7 +1,15 @@
+import { createRoot } from "react-dom/client";
+import App from "./app/App.tsx";
+import "./styles/index.css";
+import { supabase } from "./lib/supabase";
 
-  import { createRoot } from "react-dom/client";
-  import App from "./app/App.tsx";
-  import "./styles/index.css";
+console.log("🔥 main loaded");
 
-  createRoot(document.getElementById("root")!).render(<App />);
+(async () => {
+  const { data, error } = await supabase.from("profiles").select("*");
+  console.log("DATA:", data);
+  console.log("ERROR:", error);
+})();
+
+createRoot(document.getElementById("root")!).render(<App />);
   

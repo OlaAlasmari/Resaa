@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
    Menu, Search, MapPin, Gavel, Bell, User, ShieldCheck,
    TrendingUp, Home, AlertTriangle, Filter, ChevronDown,
@@ -44,6 +44,8 @@ import WalletPage from "./components/pages/WalletPage";
 import LiveBiddingPage from "./components/pages/LiveBiddingPage";
 import ParticipationModal from "./components/ParticipationModal";
 import ListingAuctionCard from "./components/ListingAuctionCard";
+import { authService } from "./services/AuthService";
+import { User as AppUser } from "./models/User";
 
 
 
@@ -391,8 +393,8 @@ const Footer = () => (
 
 export default function App() {
    const [currentView, setCurrentView] = useState<ViewState>('home');
-   const [isLoggedIn, setIsLoggedIn] = useState(false);
-   const [walletOpen, setWalletOpen] = useState(false);
+   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+   const [authLoading, setAuthLoading] = useState(true); const [walletOpen, setWalletOpen] = useState(false);
    const [walletBalance, setWalletBalance] = useState(45000);
    const [participationOpen, setParticipationOpen] = useState(false);
    const [favorites, setFavorites] = useState<string[]>([]);
@@ -400,17 +402,89 @@ export default function App() {
    const [showLoginModal, setShowLoginModal] = useState(false);
    const [hasBankInfo, setHasBankInfo] = useState(false);
 
-   // Mock User Data
-   const user = {
-      name: 'محمد القحطاني',
-      id: '1023456789',
-      phone: '0501234567',
-      email: 'mohammed@example.com'
+   const isLoggedIn = !!currentUser;
+
+   const userData = currentUser
+      ? {
+         name: currentUser.name,
+         id: currentUser.nationalId,
+         phone: currentUser.phone,
+         email: currentUser.email,
+      }
+      : {
+         name: "",
+         id: "",
+         phone: "",
+         email: "",
+      };
+
+   useEffect(() => {
+      const loadCurrentUser = async () => {
+         try {
+            const user = await authService.getCurrentUser();
+            setCurrentUser(user);
+         } catch (error) {
+            console.error("Failed to load current user:", error);
+         } finally {
+            setAuthLoading(false);
+         }
+      };
+
+      loadCurrentUser();
+   }, []);
+
+   const handleRegisterSubmit = async (data: {
+      firstName: string;
+      lastName: string;
+      nationalId: string;
+      phone: string;
+      email: string;
+      password: string;
+      address: string;
+   }) => {
+      const user = await authService.register({
+         firstName: data.firstName,
+         lastName: data.lastName,
+         nationalId: data.nationalId,
+         phone: data.phone,
+         email: data.email,
+         password: data.password,
+         address: data.address,
+         role: "bidder",
+      });
+
+      setCurrentUser(user);
+      navigate("home");
    };
 
+   const handleLoginSubmit = async (data: {
+      nationalId: string;
+      password: string;
+   }) => {
+      const user = await authService.login({
+         nationalId: data.nationalId,
+         password: data.password,
+      });
+
+      setCurrentUser(user);
+      navigate("home");
+   };
+
+   const handleLogout = async () => {
+      try {
+         await authService.logout();
+         setCurrentUser(null);
+         setIsSidePanelOpen(false);
+         navigate("home");
+      } catch (error) {
+         alert("فشل تسجيل الخروج");
+      }
+   };
+
+   // Mock User Data
+
    const navigate = (view: ViewState) => {
-      // Intercept protected routes if not logged in
-      if (!isLoggedIn && (view === 'my-auctions' || view === 'favorites' || view === 'wallet')) {
+      if (!currentUser && (view === 'my-auctions' || view === 'favorites' || view === 'wallet')) {
          setShowLoginModal(true);
          return;
       }
@@ -446,14 +520,22 @@ export default function App() {
 
    const isFavorite = (id: string) => favorites.includes(id);
 
+   if (authLoading) {
+      return (
+         <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] text-[#30364F]">
+            جارٍ التحميل...
+         </div>
+      );
+   }
+
    return (
       <div dir="rtl" className="min-h-screen bg-[#f8fafc] font-sans text-[#30364F] selection:bg-[#30364F] selection:text-white flex flex-col relative overflow-x-hidden">
 
          <SidePanel
             isOpen={isSidePanelOpen}
             onClose={() => setIsSidePanelOpen(false)}
-            user={user}
-            onLogout={() => { setIsLoggedIn(false); setIsSidePanelOpen(false); navigate('home'); }}
+            user={userData}
+            onLogout={handleLogout}
             onNavigate={navigate}
          />
 
@@ -473,7 +555,7 @@ export default function App() {
          <main className="flex-1">
             <AnimatePresence mode="wait">
 
-//Call pages
+               {/* Call pages */}
                {currentView === "home" && (
                   <Homepage
                      navigate={navigate}
@@ -492,20 +574,14 @@ export default function App() {
 
                {currentView === "login" && (
                   <LoginPage
-                     onLogin={() => {
-                        setIsLoggedIn(true);
-                        navigate("home");
-                     }}
+                     onLoginSubmit={handleLoginSubmit}
                      onGoToRegister={() => navigate("register")}
                   />
                )}
 
                {currentView === "register" && (
                   <RegisterPage
-                     onLogin={() => {
-                        setIsLoggedIn(true);
-                        navigate("home");
-                     }}
+                     onRegisterSubmit={handleRegisterSubmit}
                      onGoToLogin={() => navigate("login")}
                   />
                )}
@@ -519,7 +595,7 @@ export default function App() {
                )}
 
                {currentView === "profile" && (
-                  <ProfilePage user={user} />
+                  <ProfilePage user={userData} />
                )}
 
                {currentView === "bid-history" && (

@@ -2,19 +2,28 @@ import React from "react";
 import AuthView from "../AuthView";
 
 type RegisterPageProps = {
-  onLogin: () => void;
+  onRegisterSubmit: (data: {
+    firstName: string;
+    lastName: string;
+    nationalId: string;
+    phone: string;
+    email: string;
+    password: string;
+    address: string;
+  }) => void | Promise<void>;
   onGoToLogin: () => void;
 };
 
 export default function RegisterPage({
-  onLogin,
+  onRegisterSubmit,
   onGoToLogin,
 }: RegisterPageProps) {
   return (
     <AuthView
       isRegister={true}
       onToggle={onGoToLogin}
-      onLogin={onLogin}
+      onLoginSubmit={async () => {}}
+      onRegisterSubmit={onRegisterSubmit}
     />
   );
 }
