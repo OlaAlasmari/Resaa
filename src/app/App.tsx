@@ -401,6 +401,7 @@ export default function App() {
    const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
    const [showLoginModal, setShowLoginModal] = useState(false);
    const [hasBankInfo, setHasBankInfo] = useState(false);
+   const [selectedAuctionId, setSelectedAuctionId] = useState<string | null>(null);
 
    const isLoggedIn = !!currentUser;
 
@@ -569,6 +570,7 @@ export default function App() {
                      navigate={navigate}
                      isFavorite={isFavorite}
                      toggleFavorite={toggleFavorite}
+                     setSelectedAuctionId={setSelectedAuctionId}
                   />
                )}
 
@@ -620,11 +622,21 @@ export default function App() {
                                     id={id}
                                     title="مزاد محفوظ"
                                     location="موقع محفوظ"
-                                    days="02" hours="05" minutes="30" seconds="00"
-                                    onClick={() => navigate('auction-detail')}
+                                    days="02"
+                                    hours="05"
+                                    minutes="30"
+                                    seconds="00"
+                                    duration="3 أيام"
+                                    productsCount="1 منتج"
+                                    date="2026/02/02"
+                                    time="07:00 م"
+                                    onClick={() => navigate("auction-detail")}
                                     isFavorite={true}
-                                    onToggleFavorite={(e) => { e.stopPropagation(); toggleFavorite(id); }}
-                                    image={[ASSETS.villa, ASSETS.residential, ASSETS.commercialBuilding, ASSETS.landPlot][idx % 4]}
+                                    onToggleFavorite={(e) => {
+                                       e.stopPropagation();
+                                       toggleFavorite(id);
+                                    }}
+                                    image={[ASSETS.villa, ASSETS.residential, ASSETS.commercialBuilding][idx % 3]}
                                  />
                               ))}
                            </div>
@@ -636,10 +648,13 @@ export default function App() {
                {currentView === 'auction-detail' && (
                   <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
                      <AuctionDetailPage
-                        onBack={() => navigate('auction-browse')}
+                        onBack={() => navigate("auction-browse")}
                         onParticipate={() => setParticipationOpen(true)}
-                        isFavorite={isFavorite('detail-1')}
-                        onToggleFavorite={() => toggleFavorite('detail-1')}
+                        isFavorite={selectedAuctionId ? isFavorite(selectedAuctionId) : false}
+                        onToggleFavorite={() => {
+                           if (selectedAuctionId) toggleFavorite(selectedAuctionId);
+                        }}
+                        selectedAuctionId={selectedAuctionId}
                      />
                   </motion.div>
                )}

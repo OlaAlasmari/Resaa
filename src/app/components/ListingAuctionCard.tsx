@@ -26,6 +26,10 @@ type Props = {
   hours: string;
   minutes: string;
   seconds: string;
+  duration: string;
+  productsCount: string;
+  date: string;
+  time: string;
   onClick: () => void;
   isFavorite: boolean;
   onToggleFavorite: (e: React.MouseEvent) => void;
@@ -39,6 +43,10 @@ export default function ListingAuctionCard({
   hours,
   minutes,
   seconds,
+  duration,
+  productsCount,
+  date,
+  time,
   onClick,
   isFavorite,
   onToggleFavorite,
@@ -49,7 +57,6 @@ export default function ListingAuctionCard({
       className={`bg-[#f8fafc] rounded-xl overflow-hidden shadow-sm border ${THEME.border} group cursor-pointer`}
       onClick={onClick}
     >
-      {/* Image Area */}
       <div className="relative h-48 bg-slate-200">
         <ImageWithFallback
           src={image || ASSETS.heroBg}
@@ -76,7 +83,6 @@ export default function ListingAuctionCard({
         </div>
       </div>
 
-      {/* Countdown Section */}
       <div className="bg-[#f0fdf4] border-b border-slate-100 py-3 px-4">
         <div className="text-center text-[10px] text-emerald-700 font-bold uppercase mb-2">
           جاري ينتهي بعد
@@ -104,35 +110,33 @@ export default function ListingAuctionCard({
         </div>
       </div>
 
-      {/* Info Stats */}
       <div className="bg-white p-4 grid grid-cols-2 gap-4 text-sm">
         <div className="flex items-center gap-2 justify-center">
           <Clock className="w-4 h-4 text-slate-500" />
           <span className="font-bold text-slate-700">
-            المدة 3 أيام
+            المدة {duration}
           </span>
         </div>
 
         <div className="flex items-center gap-2 justify-center">
           <LayoutDashboard className="w-4 h-4 text-slate-500" />
           <span className="font-bold text-slate-700">
-            3 منتجات
+            {productsCount}
           </span>
         </div>
 
         <div className="col-span-2 flex items-center justify-center gap-3 border-t border-dotted border-slate-200 pt-3 mt-1 text-sm">
           <Calendar className="w-4 h-4 text-slate-500" />
           <span className="font-bold text-slate-800">
-            2026/02/02
+            {date}
           </span>
           <span className="text-slate-300">|</span>
           <span className="font-bold text-slate-800">
-            07:00 م
+            {time}
           </span>
         </div>
       </div>
 
-      {/* Footer */}
       <div className="p-4 flex justify-between items-center bg-slate-50 border-t border-slate-100">
         <Button className="!w-32 !py-2 !rounded-md">
           التفاصيل

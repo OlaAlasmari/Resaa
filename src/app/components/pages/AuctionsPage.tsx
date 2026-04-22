@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ViewState } from "../../types";
 import { Button } from "../ui/button";
 import ListingAuctionCard from "../ListingAuctionCard";
 import { Filter } from "lucide-react";
+import { supabase } from "../../../lib/supabase";
+import { Auction, AuctionRow } from "../../models/Auction";
 
 const ASSETS = {
   detailRef: "figma:asset/847f6780f0acaecd11d2c4c7b0718985c1af7a04.png",
@@ -27,57 +29,230 @@ type AuctionsPageProps = {
   navigate: (view: ViewState) => void;
   isFavorite: (id: string) => boolean;
   toggleFavorite: (id: string) => void;
+  setSelectedAuctionId: React.Dispatch<React.SetStateAction<string | null>>;
+};
+
+const parseAuctionDate = (value?: string | null) => {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+
+  // إذا التاريخ فيه وقت أو بصيغة ISO
+  if (trimmed.includes("T") || trimmed.includes("-")) {
+    const date = new Date(trimmed);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  // إذا كان بصيغة yyyy/mm/dd
+  const ymdMatch = trimmed.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (ymdMatch) {
+    const [, year, month, day] = ymdMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day), 23, 59, 59);
+  }
+
+  // إذا كان بصيغة dd/mm/yyyy
+  const dmyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmyMatch) {
+    const [, day, month, year] = dmyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day), 23, 59, 59);
+  }
+
+  return null;
+};
+
+const extractDurationDays = (duration?: string | null) => {
+  if (!duration) return 0;
+  const match = duration.match(/\d+/);
+  return match ? Number(match[0]) : 0;
+};
+
+const normalizeDateOnly = (date: Date) => {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+};
+
+const getAuctionStatus = (
+  startTime?: string | null,
+  endTime?: string | null,
+  duration?: string | null
+): "current" | "upcoming" | "ended" => {
+  const now = normalizeDateOnly(new Date());
+  const start = parseAuctionDate(startTime);
+
+  if (!start) return "upcoming";
+
+  const startDateOnly = normalizeDateOnly(start);
+
+  let end = parseAuctionDate(endTime);
+
+  if (!end) {
+    const days = extractDurationDays(duration);
+    end = new Date(start);
+    end.setDate(end.getDate() + days);
+  }
+
+  const endDateOnly = normalizeDateOnly(end);
+
+  if (now < startDateOnly) return "upcoming";
+  if (now > endDateOnly) return "ended";
+  return "current";
 };
 
 export default function AuctionsPage({
   navigate,
   isFavorite,
   toggleFavorite,
+  setSelectedAuctionId,
 }: AuctionsPageProps) {
+  const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [propertyType, setPropertyType] = useState("الكل");
+  const [city, setCity] = useState("الكل");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [filterType, setFilterType] = useState("current");
+
+  useEffect(() => {
+    const fetchAuctions = async () => {
+      const { data, error } = await supabase
+        .from("auction")
+        .select(`
+  *,
+  property (*)
+`)
+        .order("auction_id", { ascending: true });
+
+      console.log("SUPABASE DATA:", data);
+      console.log("SUPABASE ERROR:", error);
+
+      if (error) {
+        console.error("Error fetching auctions:", error.message);
+        return;
+      }
+
+      const mappedAuctions = (data as AuctionRow[]).map((row) =>
+        Auction.fromRow(row)
+      );
+
+      console.log("MAPPED AUCTIONS:", mappedAuctions);
+      setAuctions(mappedAuctions);
+    };
+
+    fetchAuctions();
+  }, []);
+
+  const filteredAuctions = useMemo(() => {
+    return auctions.filter((auction) => {
+      const status = getAuctionStatus(
+        auction.startTime,
+        auction.endTime,
+        auction.durationText
+      );
+
+      const matchesFilterType = status === filterType;
+
+      const matchesPropertyType =
+        propertyType === "الكل" || auction.propertyType === propertyType;
+
+      const matchesCity =
+        city === "الكل" || auction.location.includes(city);
+
+      const matchesMin =
+        minPrice === "" || auction.startPrice >= Number(minPrice);
+
+      const matchesMax =
+        maxPrice === "" || auction.startPrice <= Number(maxPrice);
+
+      return (
+        matchesFilterType &&
+        matchesPropertyType &&
+        matchesCity &&
+        matchesMin &&
+        matchesMax
+      );
+    });
+  }, [auctions, propertyType, city, minPrice, maxPrice, filterType]);
   return (
-   <motion.div
-  initial={{ opacity: 0 }}
-  animate={{ opacity: 1 }}
-  exit={{ opacity: 0 }}
-  className="bg-[#f8fafc] min-h-screen"
->
-      <HorizontalFilterBar />
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="bg-[#f8fafc] min-h-screen"
+    >
+      <HorizontalFilterBar
+        filterType={filterType}
+        setFilterType={setFilterType}
+        propertyType={propertyType}
+        setPropertyType={setPropertyType}
+        city={city}
+        setCity={setCity}
+        minPrice={minPrice}
+        setMinPrice={setMinPrice}
+        maxPrice={maxPrice}
+        setMaxPrice={setMaxPrice}
+      />
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <ListingAuctionCard
-            key={i}
-            id={`browse-${i}`}
-            title={`مزاد الفرصة رقم ${i}`}
-            location="الرياض - شمال الرياض"
-            days="03"
-            hours="12"
-            minutes="00"
-            seconds="45"
-            onClick={() => navigate("auction-detail")}
-            isFavorite={isFavorite(`browse-${i}`)}
-            onToggleFavorite={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              toggleFavorite(`browse-${i}`);
-            }}
-            image={[
-              ASSETS.villa,
-              ASSETS.residential,
-              ASSETS.commercialBuilding,
-              ASSETS.landPlot,
-              ASSETS.villa,
-              ASSETS.residential,
-            ][i - 1]}
-          />
-        ))}
+        {filteredAuctions.length > 0 ? (
+          filteredAuctions.map((auction) => (
+            <ListingAuctionCard
+              key={auction.id}
+              id={auction.id}
+              title={auction.title}
+              location={auction.location}
+              days={auction.days}
+              hours={auction.hours}
+              minutes={auction.minutes}
+              seconds={auction.seconds}
+              duration={auction.durationText}
+              productsCount={auction.productsCountText}
+              date={auction.displayDate}
+              time={auction.displayTime}
+              onClick={() => {
+                setSelectedAuctionId(auction.id);
+                navigate("auction-detail");
+              }}
+              isFavorite={isFavorite(auction.id)}
+              onToggleFavorite={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                toggleFavorite(auction.id);
+              }}
+              image={auction.imageUrl}
+            />
+          ))
+        ) : (
+          <div className="col-span-full text-center py-16 text-slate-500 font-bold">
+            لا توجد مزادات مطابقة
+          </div>
+        )}
       </div>
     </motion.div>
   );
 }
 
-const HorizontalFilterBar = () => {
-  const [filterType, setFilterType] = useState("current");
+type HorizontalFilterBarProps = {
+  filterType: string;
+  setFilterType: React.Dispatch<React.SetStateAction<string>>;
+  propertyType: string;
+  setPropertyType: React.Dispatch<React.SetStateAction<string>>;
+  city: string;
+  setCity: React.Dispatch<React.SetStateAction<string>>;
+  minPrice: string;
+  setMinPrice: React.Dispatch<React.SetStateAction<string>>;
+  maxPrice: string;
+  setMaxPrice: React.Dispatch<React.SetStateAction<string>>;
+};
 
+const HorizontalFilterBar = ({
+  filterType,
+  setFilterType,
+  propertyType,
+  setPropertyType,
+  city,
+  setCity,
+  minPrice,
+  setMinPrice,
+  maxPrice,
+  setMaxPrice,
+}: HorizontalFilterBarProps) => {
   return (
     <div className={`bg-white border-b ${THEME.border} sticky top-20 z-40 shadow-sm py-4`}>
       <div className="max-w-7xl mx-auto px-4 md:px-8 space-y-4">
@@ -103,11 +278,17 @@ const HorizontalFilterBar = () => {
               <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                 نوع العقار
               </label>
-              <select className="w-full text-sm border-slate-300 rounded-md focus:ring-[#30364F] focus:border-[#30364F]">
+              <select
+                value={propertyType}
+                onChange={(e) => setPropertyType(e.target.value)}
+                className="w-full text-sm border-slate-300 rounded-md focus:ring-[#30364F] focus:border-[#30364F]"
+              >
                 <option>الكل</option>
-                <option>أرض سكنية</option>
-                <option>أرض تجارية</option>
+                <option>أرض</option>
+                <option>فيلا</option>
                 <option>عمارة</option>
+                <option>شقة</option>
+                <option>سوق</option>
               </select>
             </div>
 
@@ -115,11 +296,16 @@ const HorizontalFilterBar = () => {
               <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                 المدينة
               </label>
-              <select className="w-full text-sm border-slate-300 rounded-md focus:ring-[#30364F] focus:border-[#30364F]">
+              <select
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full text-sm border-slate-300 rounded-md focus:ring-[#30364F] focus:border-[#30364F]"
+              >
                 <option>الكل</option>
-                <option>الرياض</option>
                 <option>جدة</option>
+                <option>الرياض</option>
                 <option>الدمام</option>
+                <option>مكة</option>
               </select>
             </div>
 
@@ -132,6 +318,8 @@ const HorizontalFilterBar = () => {
                   type="number"
                   min="0"
                   placeholder="0"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
                   className="w-full text-sm border-slate-300 rounded-md focus:ring-[#30364F] focus:border-[#30364F]"
                 />
               </div>
@@ -143,6 +331,8 @@ const HorizontalFilterBar = () => {
                   type="number"
                   min="0"
                   placeholder="غير محدود"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
                   className="w-full text-sm border-slate-300 rounded-md focus:ring-[#30364F] focus:border-[#30364F]"
                 />
               </div>
@@ -164,11 +354,10 @@ const HorizontalFilterBar = () => {
               <button
                 key={tab.id}
                 onClick={() => setFilterType(tab.id)}
-                className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                  filterType === tab.id
-                    ? "bg-white text-[#30364F] shadow-sm ring-1 ring-slate-200"
-                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-                }`}
+                className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all ${filterType === tab.id
+                  ? "bg-white text-[#30364F] shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                  }`}
               >
                 {tab.label}
               </button>

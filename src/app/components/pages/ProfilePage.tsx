@@ -191,12 +191,12 @@ export default function ProfilePage({ user }: ProfilePageProps) {
                 <div className="grid md:grid-cols-2 gap-x-8 gap-y-6 flex-1">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 ml-1">الاسم الأول</label>
-                    <input disabled={!editMode} type="text" defaultValue="محمد" className="w-full bg-[#F6F7F9] rounded-xl px-5 py-3.5 text-sm font-bold text-[#30364F] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#30364F]/20 transition-all" />
+                    <input disabled={!editMode} type="text" defaultValue={user.name.split(" ")[0] || ""} className="w-full bg-[#F6F7F9] rounded-xl px-5 py-3.5 text-sm font-bold text-[#30364F] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#30364F]/20 transition-all" />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 ml-1">اسم العائلة</label>
-                    <input disabled={!editMode} type="text" defaultValue="القحطاني" className="w-full bg-[#F6F7F9] rounded-xl px-5 py-3.5 text-sm font-bold text-[#30364F] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#30364F]/20 transition-all" />
+                    <input disabled={!editMode} type="text" defaultValue={user.name.split(" ").slice(1).join(" ") || ""}  className="w-full bg-[#F6F7F9] rounded-xl px-5 py-3.5 text-sm font-bold text-[#30364F] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#30364F]/20 transition-all" />
                   </div>
 
                   <div className="md:col-span-2 space-y-2">
@@ -211,7 +211,7 @@ export default function ProfilePage({ user }: ProfilePageProps) {
 
                   <div className="md:col-span-2 space-y-2">
                     <label className="text-xs font-bold text-slate-400 ml-1">العنوان الوطني</label>
-                    <input disabled={!editMode} type="text" defaultValue="الرياض، حي الملز، شارع الجامعة" className="w-full bg-[#F6F7F9] rounded-xl px-5 py-3.5 text-sm font-bold text-[#30364F] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#30364F]/20 transition-all" />
+                    <input disabled={!editMode} type="text" defaultValue="جدة، حي الورود" className="w-full bg-[#F6F7F9] rounded-xl px-5 py-3.5 text-sm font-bold text-[#30364F] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#30364F]/20 transition-all" />
                   </div>
 
                   <div className="space-y-2">

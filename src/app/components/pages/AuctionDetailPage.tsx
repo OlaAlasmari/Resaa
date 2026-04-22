@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ChevronLeft,
   Heart,
   MapPin,
-  Calendar,
   Gavel,
   ChevronUp,
   BarChart3,
@@ -14,15 +13,12 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
+import { supabase } from "../../../lib/supabase";
+import { PropertyDetails, PropertyJoinRow } from "../../models/Property";
 
 const THEME = {
   border: "border-[#cbd5e1]",
   textPrimary: "text-[#30364F]",
-};
-
-const ASSETS = {
-  heroBg:
-    "https://images.unsplash.com/photo-1722009591790-f47342aa9d3f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzYXVkaSUyMGFyYWJpYSUyMGx1eHVyeSUyMHJlYWwlMjBlc3RhdGV8ZW58MXx8fHwxNzcxOTcyNjA5fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
 };
 
 type AuctionDetailPageProps = {
@@ -30,6 +26,7 @@ type AuctionDetailPageProps = {
   onParticipate: () => void;
   isFavorite: boolean;
   onToggleFavorite: () => void;
+  selectedAuctionId: string | null;
 };
 
 const Card = ({
@@ -52,8 +49,88 @@ export default function AuctionDetailPage({
   onParticipate,
   isFavorite,
   onToggleFavorite,
+  selectedAuctionId,
 }: AuctionDetailPageProps) {
   const [showAI, setShowAI] = useState(false);
+  const [details, setDetails] = useState<PropertyDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAuctionDetails = async () => {
+      if (!selectedAuctionId) {
+        setDetails(null);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from("auction")
+        .select(`
+    auction_id,
+    auction_name,
+    property_id,
+    start_time,
+    end_time,
+    start_price,
+    highest_bid,
+    duration,
+    products_count,
+    time,
+    property (
+      property_id,
+      property_type,
+      city,
+      district,
+      region,
+      area,
+      usage,
+      deed_number,
+      plan_number,
+      plot_number,
+      north_boundary,
+      south_boundary,
+      east_boundary,
+      west_boundary,
+      image_url
+    )
+  `)
+        .eq("auction_id", Number(selectedAuctionId))
+        .single();
+
+      if (error) {
+        console.error("Error fetching auction details:", error.message);
+        setDetails(null);
+        setLoading(false);
+        return;
+      }
+      console.log("DETAILS RAW DATA:", data);
+      console.log("PROPERTY ID FROM AUCTION:", data?.property_id);
+      console.log("PROPERTY OBJECT:", data?.property);
+      setDetails(PropertyDetails.fromJoinRow(data as PropertyJoinRow));
+      setLoading(false);
+    };
+
+    fetchAuctionDetails();
+  }, [selectedAuctionId]);
+
+  if (loading) {
+    return (
+      <div className="bg-[#f8fafc] min-h-screen flex items-center justify-center text-slate-500 font-bold">
+        جاري تحميل تفاصيل المزاد...
+      </div>
+    );
+  }
+
+  if (!details) {
+    return (
+      <div className="bg-[#f8fafc] min-h-screen flex flex-col items-center justify-center gap-4 text-slate-500 font-bold">
+        <div>لا توجد بيانات لهذا المزاد</div>
+        <Button onClick={onBack}>العودة للمزادات</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#f8fafc] min-h-screen pb-20">
@@ -66,13 +143,14 @@ export default function AuctionDetailPage({
             <ChevronLeft className="w-4 h-4" /> العودة للمزادات
           </button>
 
-          <h1 className={`font-bold text-lg ${THEME.textPrimary}`}>تفاصيل المزاد #4482</h1>
+          <h1 className={`font-bold text-lg ${THEME.textPrimary}`}>
+            تفاصيل المزاد #{details.auctionId}
+          </h1>
 
           <button
             onClick={onToggleFavorite}
-            className={`flex items-center gap-2 text-sm font-bold transition-colors ${
-              isFavorite ? "text-red-600" : "text-slate-500 hover:text-red-600"
-            }`}
+            className={`flex items-center gap-2 text-sm font-bold transition-colors ${isFavorite ? "text-red-600" : "text-slate-500 hover:text-red-600"
+              }`}
           >
             <Heart className={`w-4 h-4 ${isFavorite ? "fill-current" : ""}`} />
             <span>{isFavorite ? "تمت الإضافة للمفضلة" : "إضافة للمفضلة"}</span>
@@ -86,23 +164,23 @@ export default function AuctionDetailPage({
             <div className="md:col-span-5 space-y-4">
               <div className="h-96 relative rounded-lg overflow-hidden group border border-slate-200">
                 <ImageWithFallback
-                  src={ASSETS.heroBg}
+                  src={details.imageUrl}
                   className="w-full h-full object-cover"
-                  alt="Asset"
+                  alt={details.auctionTitle}
                 />
+
                 <div
                   onClick={onToggleFavorite}
-                  className={`absolute top-2 right-2 p-2 rounded-full cursor-pointer transition-colors shadow-sm ${
-                    isFavorite
-                      ? "bg-red-500 text-white"
-                      : "bg-white/90 text-slate-400 hover:text-red-500"
-                  }`}
+                  className={`absolute top-2 right-2 p-2 rounded-full cursor-pointer transition-colors shadow-sm ${isFavorite
+                    ? "bg-red-500 text-white"
+                    : "bg-white/90 text-slate-400 hover:text-red-500"
+                    }`}
                 >
                   <Heart className={`w-5 h-5 ${isFavorite ? "fill-current" : ""}`} />
                 </div>
 
                 <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
-                  1 من 5 صور
+                  1 من 1 صور
                 </div>
               </div>
 
@@ -114,7 +192,9 @@ export default function AuctionDetailPage({
                   scrolling="no"
                   marginHeight={0}
                   marginWidth={0}
-                  src="https://maps.google.com/maps?width=100%25&amp;height=600&amp;hl=en&amp;q=Riyadh%20Saudi%20Arabia+(Rasaa%20Auction)&amp;t=&amp;z=14&amp;ie=UTF8&amp;iwloc=B&amp;output=embed"
+                  src={`https://maps.google.com/maps?width=100%25&height=600&hl=ar&q=${encodeURIComponent(
+                    `${details.city} ${details.district} Saudi Arabia`
+                  )}&t=&z=14&ie=UTF8&iwloc=B&output=embed`}
                   className="w-full h-full opacity-90 hover:opacity-100 transition-opacity"
                 ></iframe>
 
@@ -128,10 +208,10 @@ export default function AuctionDetailPage({
               <div className="flex justify-between items-start border-b border-slate-100 pb-4">
                 <div>
                   <h3 className="text-2xl font-black text-[#30364F] mb-1">
-                    فيلا سكنية - حي القيروان
+                    {details.auctionTitle}
                   </h3>
                   <div className="flex items-center gap-1 text-sm text-slate-500">
-                    <MapPin className="w-4 h-4" /> الرياض، حي القيروان
+                    <MapPin className="w-4 h-4" /> {details.locationText}
                   </div>
                 </div>
 
@@ -140,7 +220,7 @@ export default function AuctionDetailPage({
                     السعر الحالي
                   </div>
                   <div className="text-2xl font-black text-[#30364F]">
-                    2,350,000 ر.س
+                    {details.currentPrice}
                   </div>
                 </div>
               </div>
@@ -148,39 +228,47 @@ export default function AuctionDetailPage({
               <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
                 <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
                   <span className="text-slate-500">النوع</span>
-                  <span className="font-bold text-slate-800">فيلا</span>
+                  <span className="font-bold text-slate-800">{details.propertyType}</span>
                 </div>
+
                 <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
                   <span className="text-slate-500">المساحة م2</span>
-                  <span className="font-bold text-slate-800 dir-ltr">1,182.13</span>
+                  <span className="font-bold text-slate-800 dir-ltr">{details.area}</span>
                 </div>
+
                 <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
                   <span className="text-slate-500">رقم الصك</span>
-                  <span className="font-bold text-slate-800 font-mono">8802695657600000</span>
+                  <span className="font-bold text-slate-800 font-mono">{details.deedNumber}</span>
                 </div>
+
                 <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
                   <span className="text-slate-500">الاستخدام</span>
-                  <span className="font-bold text-slate-800">سكني</span>
+                  <span className="font-bold text-slate-800">{details.usage}</span>
                 </div>
+
                 <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
                   <span className="text-slate-500">السعر الافتتاحي</span>
-                  <span className="font-bold text-slate-800">1,500,000 ر.س</span>
+                  <span className="font-bold text-slate-800">{details.openingPrice}</span>
                 </div>
+
                 <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
                   <span className="text-slate-500">رقم المخطط</span>
-                  <span className="font-bold text-slate-800">3256</span>
+                  <span className="font-bold text-slate-800">{details.planNumber}</span>
                 </div>
+
                 <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
                   <span className="text-slate-500">الحي</span>
-                  <span className="font-bold text-slate-800">القيروان</span>
+                  <span className="font-bold text-slate-800">{details.district}</span>
                 </div>
+
                 <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
                   <span className="text-slate-500">رقم القطعة</span>
-                  <span className="font-bold text-slate-800">1/1/1450</span>
+                  <span className="font-bold text-slate-800">{details.plotNumber}</span>
                 </div>
+
                 <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
                   <span className="text-slate-500">العربون</span>
-                  <span className="font-bold text-[#30364F]">300,000 ر.س</span>
+                  <span className="font-bold text-[#30364F]">{details.deposit}</span>
                 </div>
               </div>
 
@@ -189,27 +277,19 @@ export default function AuctionDetailPage({
                 <div className="space-y-2 text-xs">
                   <div className="flex gap-2">
                     <span className="font-bold w-12 text-slate-500">شمالاً</span>
-                    <span className="text-slate-700 flex-1">
-                      قطعة رقم 1451 / 2 ورقم 1453 / 1 بطول 34.45م
-                    </span>
+                    <span className="text-slate-700 flex-1">{details.northBoundary}</span>
                   </div>
                   <div className="flex gap-2">
                     <span className="font-bold w-12 text-slate-500">جنوباً</span>
-                    <span className="text-slate-700 flex-1">
-                      شارع عرض 15م وقطعة رقم 1456 / 2 بطول 42.87م
-                    </span>
+                    <span className="text-slate-700 flex-1">{details.southBoundary}</span>
                   </div>
                   <div className="flex gap-2">
                     <span className="font-bold w-12 text-slate-500">شرقاً</span>
-                    <span className="text-slate-700 flex-1">
-                      قطعة رقم 1450 / 1 / 2 بطول 30.02م
-                    </span>
+                    <span className="text-slate-700 flex-1">{details.eastBoundary}</span>
                   </div>
                   <div className="flex gap-2">
                     <span className="font-bold w-12 text-slate-500">غرباً</span>
-                    <span className="text-slate-700 flex-1">
-                      قطعة رقم 1454 / 2 بطول 31.68م
-                    </span>
+                    <span className="text-slate-700 flex-1">{details.westBoundary}</span>
                   </div>
                 </div>
               </div>
@@ -283,13 +363,13 @@ export default function AuctionDetailPage({
                           <li className="flex gap-2 items-start">
                             <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5" />
                             <span className="text-slate-600">
-                              السعر الحالي يعتبر فرصة ممتازة للدخول (أقل من السوق بـ 8%)
+                              السعر الحالي يعتبر فرصة ممتازة للدخول
                             </span>
                           </li>
                           <li className="flex gap-2 items-start">
                             <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5" />
                             <span className="text-slate-600">
-                              ينصح بعدم تجاوز حاجز 2,650,000 ر.س لضمان هامش ربح جيد
+                              ينصح بعدم تجاوز السعر الأعلى المناسب حسب تحليلك
                             </span>
                           </li>
                         </ul>

@@ -30,6 +30,14 @@ export type ProfileRecord = {
   created_at?: string;
 };
 
+export type UpdateProfileInput = {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  nationalId: string;
+  address: string;
+};
+
 class AuthService {
   private buildUserData(profile: ProfileRecord, password = ""): UserData {
     return {
