@@ -1,35 +1,97 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ViewState } from "../../types";
 import { Button } from "../ui/button";
 import { Globe, Target } from "lucide-react";
-import { ImageWithFallback } from "../figma/ImageWithFallback";
 import ListingAuctionCard from "../ListingAuctionCard";
+import { supabase } from "../../../lib/supabase";
+import { Auction, AuctionRow } from "../../models/Auction";
 
 type HomePageProps = {
   navigate: (view: ViewState) => void;
   isFavorite: (id: string) => boolean;
   toggleFavorite: (id: string) => void;
+  setSelectedAuctionId: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
-const ASSETS = {
-  detailRef: "figma:asset/847f6780f0acaecd11d2c4c7b0718985c1af7a04.png",
-  heroBg: "https://images.unsplash.com/photo-1722009591790-f47342aa9d3f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzYXVkaSUyMGFyYWJpYSUyMGx1eHVyeSUyMHJlYWwlMjBlc3RhdGV8ZW58MXx8fHwxNzcxOTcyNjA5fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-  landPlaceholder: "figma:asset/dab0778c43e35d66c56bca4cbfdd164d2e85c03f.png",
-  commercial: "figma:asset/a.png",
-  listingRef: "figma:asset/e29d10f638fdcdc5bc4c3bcba9d7ba89ddba3171.png",
-  aiBanner: "figma:asset/e8f3f172d276c82678d8b23bf9e86fcdaeec84de.png",
-  villa: "https://images.unsplash.com/photo-1575356864509-f1727fd74ee4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB2aWxsYSUyMGV4dGVyaW9yJTIwc2F1ZGl8ZW58MXx8fHwxNzcxOTcyNjEwfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-  residential: "https://images.unsplash.com/photo-1755567818043-a86c648900de?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxyZXNpZGVudGlhbCUyMGFwYXJ0bWVudCUyMGJ1aWxkaW5nfGVufDF8fHx8MTc3MTkxMDA0MHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-  commercialBuilding: "https://images.unsplash.com/photo-1764983265127-8ec30a9c7b64?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21tZXJjaWFsJTIwcHJvcGVydHklMjBidWlsZGluZ3xlbnwxfHx8fDE3NzE5MTAzMzJ8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-  landPlot: "https://images.unsplash.com/photo-1764222233275-87dc016c11dc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsYW5kJTIwcGxvdCUyMGRldmVsb3BtZW50fGVufDF8fHx8MTc3MTk3MjYxMXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+const parseAuctionDate = (value?: string | null) => {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.includes("T") || trimmed.includes("-")) {
+    const date = new Date(trimmed);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  const dmyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmyMatch) {
+    const [, day, month, year] = dmyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const ymdMatch = trimmed.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  if (ymdMatch) {
+    const [, year, month, day] = ymdMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  return null;
+};
+
+const normalizeDateOnly = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const isUpcomingAuction = (startTime?: string | null) => {
+  const start = parseAuctionDate(startTime);
+  if (!start) return false;
+
+  const today = normalizeDateOnly(new Date());
+  const startDateOnly = normalizeDateOnly(start);
+
+  return startDateOnly > today;
 };
 
 export default function HomePage({
   navigate,
   isFavorite,
   toggleFavorite,
+  setSelectedAuctionId,
 }: HomePageProps) {
+  const [auctions, setAuctions] = useState<Auction[]>([]);
+
+  useEffect(() => {
+    const fetchAuctions = async () => {
+      const { data, error } = await supabase
+        .from("auction")
+        .select(`
+          *,
+          property (*)
+        `)
+        .order("auction_id", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching home auctions:", error.message);
+        return;
+      }
+
+      const mappedAuctions = (data as AuctionRow[]).map((row) =>
+        Auction.fromRow(row)
+      );
+
+      setAuctions(mappedAuctions);
+    };
+
+    fetchAuctions();
+  }, []);
+
+  const upcomingAuctions = useMemo(() => {
+    return auctions
+      .filter((auction) => isUpcomingAuction(auction.startTime))
+      .slice(0, 3);
+  }, [auctions]);
+
   return (
     <div className="bg-[#f8fafc] min-h-screen">
       {/* Hero Section */}
@@ -66,33 +128,58 @@ export default function HomePage({
       <VisionMissionSection />
 
       {/* Latest Opportunities */}
-       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                         
-      
-                         {/* Vision & Mission */}
-      
-                         <section className="max-w-7xl mx-auto px-4 py-16">
-                            <div className="flex justify-between items-center mb-8">
-                               <h2 className="text-2xl font-black">أحدث الفرص الاستثمارية</h2>
-                               <Button variant="ghost" onClick={() => navigate('auction-browse')}>عرض الكل</Button>
-                            </div>
-                            <div className="grid md:grid-cols-3 gap-6">
-                               {[1, 2, 3].map((i) => (
-                                   <ListingAuctionCard 
-                                      key={i}
-                                      id={`featured-${i}`}
-                                      title={i === 1 ? "مزاد البركة" : i === 2 ? "مزاد أريج الباحة" : "مزاد الباحة"}
-                                      location="مكة المكرمة - العاصمة المقدسة" 
-                                      days="01" hours="20" minutes="28" seconds="09" 
-                                      onClick={() => navigate('auction-detail')}
-                                      isFavorite={isFavorite(`featured-${i}`)}
-                                      onToggleFavorite={(e) => { e.stopPropagation(); toggleFavorite(`featured-${i}`); }}
-                                      image={i === 1 ? ASSETS.villa : i === 2 ? ASSETS.residential : ASSETS.commercialBuilding}
-                                   />
-                               ))}
-                            </div>
-                         </section>
-                      </motion.div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <section className="max-w-7xl mx-auto px-4 py-16">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-2xl font-black">أحدث الفرص الاستثمارية</h2>
+            <Button
+              variant="ghost"
+              onClick={() => navigate("auction-browse")}
+            >
+              عرض الكل
+            </Button>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {upcomingAuctions.length > 0 ? (
+              upcomingAuctions.map((auction) => (
+                <ListingAuctionCard
+                  key={auction.id}
+                  id={auction.id}
+                  title={auction.title}
+                  location={auction.location}
+                  days={auction.days}
+                  hours={auction.hours}
+                  minutes={auction.minutes}
+                  seconds={auction.seconds}
+                  duration={auction.durationText}
+                  productsCount={auction.productsCountText}
+                  date={auction.displayDate}
+                  time={auction.displayTime}
+                  onClick={() => {
+                    setSelectedAuctionId(auction.id);
+                    navigate("auction-detail");
+                  }}
+                  isFavorite={isFavorite(auction.id)}
+                  onToggleFavorite={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    toggleFavorite(auction.id);
+                  }}
+                  image={auction.imageUrl}
+                />
+              ))
+            ) : (
+              <div className="col-span-full text-center py-16 text-slate-500 font-bold">
+                لا توجد مزادات قادمة حالياً
+              </div>
+            )}
+          </div>
+        </section>
+      </motion.div>
     </div>
   );
 }

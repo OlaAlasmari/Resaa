@@ -78,7 +78,7 @@ const THEME = {
    accentText: "text-[#f8fafc]",
    secondary: "bg-[#B7E5CD]", // Light Blue-Green
    secondaryText: "text-[#B7E5CD]",
-   navbarBg: "bg-[#30364F]", // Deep Blue for navbar
+   navbarBg: "bg-[#213448]", // Deep Blue for navbar
    footerBg: "bg-[#30364F]" // Deep Blue for footer
 };
 
@@ -353,7 +353,7 @@ const WalletModal = ({ balance, onClose, onRecharge }: { balance: number, onClos
 // --- Footer ---
 
 const Footer = () => (
-   <footer className="bg-[#30364F] text-white py-12 mt-auto">
+   <footer className="bg-[#213448] text-white py-12 mt-auto">
       <div className="max-w-7xl mx-auto px-4 md:px-8 grid md:grid-cols-4 gap-8">
          <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
@@ -562,6 +562,7 @@ export default function App() {
                      navigate={navigate}
                      isFavorite={isFavorite}
                      toggleFavorite={toggleFavorite}
+                     setSelectedAuctionId={setSelectedAuctionId}
                   />
                )}
 

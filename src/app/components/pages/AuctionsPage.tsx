@@ -7,6 +7,7 @@ import { Filter } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { Auction, AuctionRow } from "../../models/Auction";
 
+
 const ASSETS = {
   detailRef: "figma:asset/847f6780f0acaecd11d2c4c7b0718985c1af7a04.png",
   heroBg:
