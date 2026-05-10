@@ -80,10 +80,9 @@ export class Auction {
 
     this.startPrice = data.startPrice ?? 0;
     this.durationText = data.durationText ?? "غير محدد";
-    this.productsCountText = data.productsCountText ?? "0 منتجات";
-    this.displayDate = data.displayDate ?? "-";
+    this.productsCountText = data.productsCountText ?? "1 أصل";
     this.displayTime = data.displayTime ?? "-";
-
+    this.displayDate = data.displayDate ?? "-"
     this.propertyId = data.propertyId ?? null;
     this.property = data.property ?? null;
   }
@@ -109,6 +108,21 @@ export class Auction {
     }
   }
 
+  // ── Auction status helpers ─────────────────────────────────────────────────
+  static isEnded(endTime: string | null): boolean {
+    const end = Auction.normalizeDateTime(endTime);
+    return end ? Date.now() > end.getTime() : false;
+  }
+
+  static isUpcoming(startTime: string | null): boolean {
+    const start = Auction.normalizeDateTime(startTime);
+    return start ? Date.now() < start.getTime() : false;
+  }
+
+  static isLive(startTime: string | null, endTime: string | null): boolean {
+    return !Auction.isEnded(endTime) && !Auction.isUpcoming(startTime);
+  }
+
   static extractDays(duration: string | null): string {
     if (!duration) return "00";
     const match = duration.match(/\d+/);
@@ -129,16 +143,89 @@ export class Auction {
     };
   }
 
-  static formatDisplayDate(dateValue: string | null): string {
-    if (!dateValue) return "-";
+  // ── Normalize any date string to a parseable format ──────────────────────
+  static normalizeDateTime(value: string | null): Date | null {
+    if (!value) return null;
+    let trimmed = value.trim();
 
-    const parts = dateValue.split("/");
-    if (parts.length === 3) {
-      const [day, month, year] = parts;
-      return `${year}/${month.padStart(2, "0")}/${day.padStart(2, "0")}`;
+    // Already has timezone
+    if (trimmed.includes("+") || trimmed.endsWith("Z")) {
+      const d = new Date(trimmed);
+      return isNaN(d.getTime()) ? null : d;
     }
 
-    return dateValue;
+    // DD/MM/YYYY — must check FIRST before anything else
+    const dmyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+    if (dmyMatch) {
+      const [, day, month, year] = dmyMatch
+      const timePart = trimmed.match(/(\d{1,2}):(\d{2})/)
+      const hour = timePart ? Number(timePart[1]) : 23
+      const min = timePart ? Number(timePart[2]) : 59
+      return new Date(Number(year), Number(month) - 1, Number(day), hour, min)
+    }
+
+    // Space separator: "2026/04/06 02:33:00"
+    if (trimmed.includes(" ") && !trimmed.includes("T")) {
+      trimmed = trimmed.replace(" ", "T");
+    }
+
+    // Has T (ISO with time)
+    if (trimmed.includes("T")) {
+      const parts = trimmed.split("T");
+      const datePart = parts[0].replace(/\//g, "-");
+      const d = new Date(`${datePart}T${parts[1]}+03:00`);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    // Date only: "2026-05-08" or "2026/05/08"
+    const clean = trimmed.replace(/\//g, "-");
+    const d = new Date(clean + "T00:00:00+03:00");
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+
+  // ── Live countdown from end_time ──────────────────────────────────────────
+  static liveCountdown(endTime: string | null): { days: string; hours: string; minutes: string; seconds: string } {
+    const end = Auction.normalizeDateTime(endTime);
+    if (!end) return { days: "00", hours: "00", minutes: "00", seconds: "00" };
+
+    const diff = end.getTime() - Date.now();
+    if (diff <= 0) return { days: "00", hours: "00", minutes: "00", seconds: "00" };
+
+    const totalSec = Math.floor(diff / 1000);
+    const d = Math.floor(totalSec / 86400);
+    const h = Math.floor((totalSec % 86400) / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+
+    return {
+      days: String(d).padStart(2, "0"),
+      hours: String(h).padStart(2, "0"),
+      minutes: String(m).padStart(2, "0"),
+      seconds: String(s).padStart(2, "0"),
+    };
+  }
+
+  static formatDisplayDate(dateValue: string | null): string {
+    if (!dateValue) return "-"
+    const trimmed = dateValue.trim()
+
+    // Skip time-only values like "22:00:00"
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) return "-"
+
+    // DD/MM/YYYY — already display format
+    const dmyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+    if (dmyMatch) {
+      return `${dmyMatch[1].padStart(2, "0")}/${dmyMatch[2].padStart(2, "0")}/${dmyMatch[3]}`
+    }
+
+    // ISO with T: "2026-05-10T09:00:00" or "2026-05-10T09:00:00+03:00"
+    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (isoMatch) {
+      return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`
+    }
+
+    return "-"
   }
 
   static formatDisplayTime(timeValue: string | null): string {
@@ -156,8 +243,10 @@ export class Auction {
   }
 
   static formatProductsCount(value: string | null): string {
-    if (!value || value.trim() === "") return "0 منتجات";
-    return value.trim();
+    if (!value || value.trim() === "") return "1 أصل"
+    const trimmed = value.trim()
+    if (/^\d+$/.test(trimmed)) return `${trimmed} أصل`
+    return trimmed.replace("منتج", "أصل").replace("منتجات", "أصول")
   }
 
   static formatDurationText(value: string | null): string {
@@ -166,34 +255,61 @@ export class Auction {
   }
 
   static fromRow(row: AuctionRow): Auction {
-    const clock = Auction.extractClock(row.time);
-    const propertyType = row.property?.property_type?.trim() ?? row.property_type?.trim() ?? "أرض";
-
+    const prop = Array.isArray(row.property) ? row.property[0] : row.property;
+    const propertyType = prop?.property_type?.trim() ?? row.property_type?.trim() ?? "أرض";
+    const countdown = Auction.liveCountdown(row.end_time);
+    // ── Extract display date from start_time ──
+    const rawDate = row.start_time ?? ""
+    let displayDate = "-"
+    if (rawDate) {
+      // DD/MM/YYYY format
+      const dmyMatch = rawDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+      if (dmyMatch) {
+        displayDate = `${dmyMatch[1].padStart(2, "0")}/${dmyMatch[2].padStart(2, "0")}/${dmyMatch[3]}`
+      }
+      // ISO format: 2026-05-10T... or 2026-05-10+...
+      else {
+        const isoMatch = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})/)
+        if (isoMatch) {
+          displayDate = `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`
+        }
+      }
+    }
     return new Auction({
       id: String(row.auction_id),
       title: row.auction_name?.trim() ?? "مزاد بدون اسم",
       location: `${row.city?.trim() ?? ""} - ${row.district?.trim() ?? ""}`,
       propertyType,
       imageUrl:
-        row.property?.image_url?.trim() ||
+        prop?.image_url?.trim() ||
         Auction.getFallbackImage(propertyType),
 
       startTime: row.start_time ?? null,
       endTime: row.end_time ?? null,
 
-      days: Auction.extractDays(row.duration),
-      hours: clock.hours,
-      minutes: clock.minutes,
-      seconds: clock.seconds,
+      days: countdown.days,
+      hours: countdown.hours,
+      minutes: countdown.minutes,
+      seconds: countdown.seconds,
 
       startPrice: row.start_price ?? 0,
       durationText: Auction.formatDurationText(row.duration),
       productsCountText: Auction.formatProductsCount(row.products_count),
-      displayDate: Auction.formatDisplayDate(row.start_time),
-      displayTime: Auction.formatDisplayTime(row.time),
-
+      displayDate: (() => {
+        const raw = row.start_time ?? ""
+        if (!raw) return "-"
+        const dmy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+        if (dmy) return `${dmy[1].padStart(2, "0")}/${dmy[2].padStart(2, "0")}/${dmy[3]}`
+        const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+        if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`
+        return "-"
+      })(),
+      displayTime: Auction.formatDisplayTime(row.time ?? row.start_time),
       propertyId: row.property_id !== null ? String(row.property_id) : null,
-      property: row.property ? new Property(row.property) : null,
+      property: prop ? new Property(prop) : null,
     });
+
   }
+
+
 }

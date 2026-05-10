@@ -56,6 +56,8 @@ export default function AuctionDetailPage({
 }: AuctionDetailPageProps) {
   const [showAI, setShowAI] = useState(false);
   const [details, setDetails] = useState<PropertyDetails | null>(null);
+  const [rawStartTime, setRawStartTime] = useState<string | null>(null);
+  const [rawEndTime, setRawEndTime]     = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLandRec, setShowLandRec] = useState(false);
 
@@ -88,7 +90,7 @@ export default function AuctionDetailPage({
           duration,
           products_count,
           time,
-          property (
+          property:property_id (
             property_id,
             property_type,
             city,
@@ -117,6 +119,8 @@ export default function AuctionDetailPage({
       }
 
       setDetails(PropertyDetails.fromJoinRow(data as PropertyJoinRow));
+      setRawStartTime(data.start_time ?? null);
+      setRawEndTime(data.end_time ?? null);
       setLoading(false);
     };
     fetchAuctionDetails();
@@ -125,6 +129,34 @@ export default function AuctionDetailPage({
       const isLand = details?.propertyType?.includes("أرض") ||
       details?.usage?.includes("أرض") ||
       details?.propertyType?.includes("قطعة");
+
+  // ── Auction status — use raw ISO timestamps, treat as Saudi time UTC+3 ────
+  const now = new Date();
+
+const parseLocalTime = (t: string | null): Date | null => {
+  if (!t) return null
+
+  // ISO format
+  if (t.includes("T") || t.includes("-")) {
+    const normalized = t.includes("+") || t.endsWith("Z") ? t : t + "+03:00"
+    return new Date(normalized)
+  }
+
+  // DD/MM/YYYY HH:MM or DD/MM/YYYY
+  const match = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/)
+  if (match) {
+    const [, day, month, year, hour = "23", min = "59"] = match
+    return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(min))
+  }
+
+  return null
+}
+
+  const startTime  = parseLocalTime(rawStartTime);
+  const endTime    = parseLocalTime(rawEndTime);
+  const isEnded    = endTime   ? now > endTime   : false;
+  const isUpcoming = startTime ? now < startTime : false;
+  const isLive     = !isEnded && !isUpcoming;
 
 
   // Fetch AI analysis once when panel first opens
@@ -313,18 +345,33 @@ export default function AuctionDetailPage({
                     </div>
                   )}
 
-                  <Button
-                    onClick={onParticipate}
-                    variant="primary"
-                    icon={Gavel}
-                    className="flex-[2] text-lg py-3 h-[54px]
-                    bg-[#91c6bc] text-[#213448] min-h-[65px] py-3
-                    shadow-md rounded-xl
-                    hover:shadow-lg hover:brightness-105
-                    transition-all duration-200"
-                  >
-                    المشاركة في المزايدة
-                  </Button>
+                  {/* Participation button — only show for live auctions */}
+                  {isLive && (
+                    <Button
+                      onClick={onParticipate}
+                      variant="primary"
+                      icon={Gavel}
+                      className="flex-[2] text-lg py-3 h-[54px]
+                      bg-[#91c6bc] text-[#213448] min-h-[65px] py-3
+                      shadow-md rounded-xl
+                      hover:shadow-lg hover:brightness-105
+                      transition-all duration-200"
+                    >
+                      المشاركة في المزايدة
+                    </Button>
+                  )}
+
+                  {isEnded && (
+                    <div className="flex-[2] min-h-[65px] flex items-center justify-center bg-slate-100 text-slate-400 font-bold rounded-xl border border-slate-200 text-sm">
+                      انتهى المزاد
+                    </div>
+                  )}
+
+                  {isUpcoming && (
+                    <div className="flex-[2] min-h-[65px] flex items-center justify-center bg-blue-50 text-blue-500 font-bold rounded-xl border border-blue-100 text-sm">
+                      لم يبدأ المزاد بعد
+                    </div>
+                  )}
 
                 </div>
                 {/* ── توصية استخدام الأرض panel ── */}
@@ -385,6 +432,10 @@ export default function AuctionDetailPage({
                                 <div className="text-2xl font-black text-[#30364F]">
                                   {PriceService.formatPrice(analysis.price_range.low)} -{" "}
                                   {PriceService.formatPrice(analysis.price_range.high)}
+                                </div>
+                                <div className="text-[10px] text-emerald-600 mt-1 flex items-center justify-center gap-1">
+                                  <TrendingUp className="w-3 h-3" />
+                                  +{analysis.annual_growth}% نمو سنوي
                                 </div>
                               </div>
 

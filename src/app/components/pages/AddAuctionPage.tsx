@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Camera, FileText, Sparkles, Loader2, Target, Clock, TrendingUp, CalendarDays, Calendar } from "lucide-react";
+import { Camera, FileText, Sparkles, Loader2, Target, Clock, TrendingUp, CalendarDays, Calendar, CheckCircle } from "lucide-react";
 import { Button } from "../ui/button";
 import InputField from "../InputField";
 import { SellerRole } from "../../types";
@@ -12,6 +12,7 @@ const THEME = {
 
 type AddAuctionPageProps = {
   onCancel: () => void;
+  currentUser?: { name: string; nationalId: string } | null;
 };
 
 type AuctionStrategy = {
@@ -384,11 +385,12 @@ const Card = ({ children, className = "" }: { children: React.ReactNode; classNa
 );
 
 // ══════════════════════════════════════════════════════════════════════════════
-export default function AddAuctionPage({ onCancel }: AddAuctionPageProps) {
+export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPageProps) {
   const [step, setStep] = useState(1);
   const [sellerRole, setSellerRole] = useState<SellerRole>("principal");
   const [showCalendar, setShowCalendar] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const [targetPrice, setTargetPrice]     = useState("");
   const [strategyLoading, setStrategyLoading] = useState(false);
@@ -407,7 +409,7 @@ export default function AddAuctionPage({ onCancel }: AddAuctionPageProps) {
   const [endTime, setEndTime]     = useState<TimeVal>({ hour: 9, minute: 0, period: "AM" });
 
   const [form, setForm] = useState({
-    fullName: "", nationalId: "", agencyNumber: "", agencyExpiry: "", agencyPlace: "",
+    fullName: currentUser?.name ?? "", nationalId: currentUser?.nationalId ?? "", agencyNumber: "", agencyExpiry: "", agencyPlace: "",
     falLicense: "", companyName: "", propertyType: "", usage: "", area: "", facade: "",
     city: "", district: "", region: "", streetName: "", mapUrl: "", northBoundary: "", southBoundary: "",
     eastBoundary: "", westBoundary: "", deedNumber: "", planNumber: "", plotNumber: "",
@@ -417,16 +419,21 @@ export default function AddAuctionPage({ onCancel }: AddAuctionPageProps) {
   const updateForm = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  // ── FIX: append +03:00 so Supabase stores the correct Saudi time ──────────
   const toDatetimeString = (date: string, time: TimeVal) => {
     if (!date) return "";
     let h = time.hour;
     if (time.period === "PM" && h !== 12) h += 12;
     if (time.period === "AM" && h === 12) h = 0;
-    return `${date}T${String(h).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}:00`;
+    return `${date}T${String(h).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}:00+03:00`;
   };
 
-  const formatTimeDisplay = (t: TimeVal) =>
-    `${String(t.hour).padStart(2, "0")}:${String(t.minute).padStart(2, "0")}:00`;
+  const formatTimeDisplay = (t: TimeVal) => {
+    let h = t.hour;
+    if (t.period === "PM" && h !== 12) h += 12;
+    if (t.period === "AM" && h === 12) h = 0;
+    return `${String(h).padStart(2, "0")}:${String(t.minute).padStart(2, "0")}:00`;
+  };
 
   const fetchAuctionStrategy = async () => {
     const price = Number(targetPrice);
@@ -531,8 +538,7 @@ export default function AddAuctionPage({ onCancel }: AddAuctionPageProps) {
       });
 
       if (auctionError) { console.error("Auction insert error:", auctionError); alert(auctionError.message || "حدث خطأ أثناء إضافة المزاد"); return; }
-      alert("تمت إضافة المزاد بنجاح");
-      onCancel();
+      setShowSuccess(true);
     } catch (err) { console.error("Unexpected error:", err); alert("حدث خطأ غير متوقع"); }
     finally { setLoading(false); }
   };
@@ -638,12 +644,12 @@ export default function AddAuctionPage({ onCancel }: AddAuctionPageProps) {
                 </div>
               </div>
               <div className="col-span-2">
-                <h4 className="text-sm font-bold text-[#30364F] mb-2 mt-2">الحدود والأطوال</h4>
+                <h4 className="text-sm font-bold text-[#30364F] mb-2 mt-2">الحدود والأطوال (بالمتر)</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <InputField label="شمالاً" placeholder="وصف الحد الشمالي" value={form.northBoundary} onChange={(e) => updateForm("northBoundary", e.target.value)} />
-                  <InputField label="جنوباً" placeholder="وصف الحد الجنوبي" value={form.southBoundary} onChange={(e) => updateForm("southBoundary", e.target.value)} />
-                  <InputField label="شرقاً" placeholder="وصف الحد الشرقي" value={form.eastBoundary} onChange={(e) => updateForm("eastBoundary", e.target.value)} />
-                  <InputField label="غرباً" placeholder="وصف الحد الغربي" value={form.westBoundary} onChange={(e) => updateForm("westBoundary", e.target.value)} />
+                  <InputField label="شمالاً" placeholder="0.00" type="number" value={form.northBoundary} onChange={(e) => updateForm("northBoundary", e.target.value)} />
+                  <InputField label="جنوباً" placeholder="0.00" type="number" value={form.southBoundary} onChange={(e) => updateForm("southBoundary", e.target.value)} />
+                  <InputField label="شرقاً" placeholder="0.00" type="number" value={form.eastBoundary} onChange={(e) => updateForm("eastBoundary", e.target.value)} />
+                  <InputField label="غرباً" placeholder="0.00" type="number" value={form.westBoundary} onChange={(e) => updateForm("westBoundary", e.target.value)} />
                 </div>
               </div>
             </div>
@@ -733,6 +739,26 @@ export default function AddAuctionPage({ onCancel }: AddAuctionPageProps) {
       </Card>
 
       <style>{`.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
+
+      {/* ── Success Modal ── */}
+      {showSuccess && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-10 max-w-sm w-full text-center shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-[#91C6BC]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="w-10 h-10 text-[#91C6BC]" strokeWidth={1.5} />
+            </div>
+            <h2 className="text-2xl font-black text-[#30364F] mb-2">تمت الإضافة بنجاح</h2>
+            <p className="text-slate-500 text-sm mb-8">
+              تم إرسال طلبك بنجاح. سيتم مراجعة المزاد وإدراجه في المنصة قريباً.
+            </p>
+            <button
+              onClick={() => { setShowSuccess(false); onCancel(); }}
+              className="w-full py-3.5 bg-[#30364F] hover:bg-[#1e2538] text-white rounded-2xl font-bold text-sm transition-colors"
+            >
+              متابعة
+            </button>
+          </div>
+        </div>
+      )}
     </div>
-  );
-}
+  );}

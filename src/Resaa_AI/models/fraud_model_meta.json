@@ -1,0 +1,36 @@
+{
+  "features": [
+    "total_auctions_participated",
+    "total_auctions_won",
+    "total_bids_history",
+    "historical_win_rate",
+    "bids_to_wins_ratio",
+    "starting_price",
+    "final_price",
+    "minimum_bid_increment",
+    "auction_duration_minutes",
+    "number_of_unique_bidders",
+    "total_bids_in_auction",
+    "bids_count_in_auction",
+    "bid_share_in_auction",
+    "avg_seconds_between_bids",
+    "first_bid_time_from_start_minutes",
+    "last_bid_time_to_end_minutes",
+    "used_minimum_increment_ratio",
+    "bid_increment_avg"
+  ],
+  "feature_explanations": {
+    "bids_to_wins_ratio": "عدد مزايدات مرتفع بشكل غير طبيعي مقارنة بالمكاسب",
+    "bid_share_in_auction": "المزايد يهيمن على المزاد الحالي",
+    "avg_seconds_between_bids": "سلوك مزايدة سريع جداً",
+    "historical_win_rate": "معدل فوز منخفض في المزادات السابقة",
+    "used_minimum_increment_ratio": "استخدام متكرر للحد الأدنى من الزيادة",
+    "bids_count_in_auction": "عدد مزايدات مرتفع في هذا المزاد",
+    "total_bids_history": "نشاط مزايدة مرتفع بشكل عام",
+    "number_of_unique_bidders": "نشاط غير طبيعي مقارنة بالمزايدين الآخرين",
+    "first_bid_time_from_start_minutes": "وقت دخول غير طبيعي للمزاد",
+    "last_bid_time_to_end_minutes": "سلوك مزايدة غير طبيعي قرب نهاية المزاد",
+    "total_auctions_participated": "مشاركة في عدد كبير من المزادات",
+    "bid_increment_avg": "متوسط زيادة غير طبيعي"
+  }
+}

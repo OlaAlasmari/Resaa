@@ -265,6 +265,20 @@ class AuthService {
 
     return message;
   }
+  
+  async forgotPassword(email: string): Promise<void> {
+  if (!email.trim()) {
+    throw new Error("البريد الإلكتروني مطلوب")
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: `${window.location.origin}/reset-password`,
+  })
+
+  if (error) {
+    throw new Error("تعذر إرسال رابط إعادة تعيين كلمة المرور")
+  }
+}
 }
 
 export const authService = new AuthService();

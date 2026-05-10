@@ -147,9 +147,6 @@ export default function AuctionsPage({
         .select(`*, property (*)`)
         .order("auction_id", { ascending: true });
 
-      console.log("SUPABASE DATA:", data);
-      console.log("SUPABASE ERROR:", error);
-
       if (error) { console.error("Error fetching auctions:", error.message); return; }
 
       const mappedAuctions = (data as AuctionRow[]).map((row) => Auction.fromRow(row));
@@ -194,36 +191,43 @@ export default function AuctionsPage({
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredAuctions.length > 0 ? (
-          filteredAuctions.map((auction) => (
-            <ListingAuctionCard
-              key={auction.id}
-              id={auction.id}
-              title={auction.title}
-              location={auction.location}
-              days={auction.days}
-              hours={auction.hours}
-              minutes={auction.minutes}
-              seconds={auction.seconds}
-              duration={auction.durationText}
-              productsCount={auction.productsCountText}
-              date={auction.displayDate}
-              time={auction.displayTime}
-              onClick={() => {
-                setSelectedAuctionId(auction.id);
-                navigate("auction-detail");
-              }}
-              isFavorite={isFavorite(auction.id)}
-              onToggleFavorite={(e: React.MouseEvent) => {
-                e.stopPropagation();
-                toggleFavorite(auction.id);
-              }}
-              image={auction.imageUrl}
-            />
-          ))
-        ) : (
+          filteredAuctions.map((auction) => {
+            const auctionStatus = getAuctionStatus(auction.startTime, auction.endTime, auction.durationText)
+            return (
+              <ListingAuctionCard
+                key={auction.id}
+                id={auction.id}
+                title={auction.title}
+                location={auction.location}
+                days={auction.days}
+                hours={auction.hours}
+                minutes={auction.minutes}
+                seconds={auction.seconds}
+                duration={auction.durationText}
+                productsCount={auction.productsCountText}
+                date={auction.displayDate ?? "-"}
+                time={auction.displayTime}
+                startTime={auction.startTime ?? ""}
+                endTime={auction.endTime ?? ""}
+                status={auctionStatus}
+                onClick={() => {
+                  setSelectedAuctionId(auction.id);
+                  navigate("auction-detail");
+                }}
+                isFavorite={isFavorite(auction.id)}
+                onToggleFavorite={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  toggleFavorite(auction.id);
+                }}
+                image={auction.imageUrl}
+              />
+            )
+          })) : (
           <div className="col-span-full text-center py-16 text-slate-500 font-bold">
             لا توجد مزادات مطابقة
+
           </div>
+
         )}
       </div>
     </motion.div>
@@ -318,25 +322,24 @@ const HorizontalFilterBar = ({
 
           </div>
 
-          
+
         </div>
 
         {/* Tabs */}
         <div className="flex justify-center pt-2">
           <div className="inline-flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
             {[
-              { id: "current",  label: "المزادات الحالية" },
+              { id: "current", label: "المزادات الحالية" },
               { id: "upcoming", label: "المزادات القادمة" },
-              { id: "ended",    label: "المزادات المنتهية" },
+              { id: "ended", label: "المزادات المنتهية" },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setFilterType(tab.id)}
-                className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all ${
-                  filterType === tab.id
-                    ? "bg-white text-[#30364F] shadow-sm ring-1 ring-slate-200"
-                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-                }`}
+                className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all ${filterType === tab.id
+                  ? "bg-white text-[#30364F] shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                  }`}
               >
                 {tab.label}
               </button>

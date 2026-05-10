@@ -12,6 +12,8 @@ export type ViewState =
   | "bid-history"
   | "support"
   | "wallet"
+  | "notifications"
+  | "reset-password"
   | "faq";
 
 export type ParticipationRole = "principal" | "agent" | null;

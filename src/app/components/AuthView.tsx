@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Gavel } from "lucide-react";
 import { Button } from "./ui/button";
+import { authService } from "../services/AuthService";
 
 const THEME = {
   textPrimary: "text-[#30364F]",
@@ -81,11 +82,10 @@ function FormField({
           onChange(newValue);
         }}
         placeholder={placeholder}
-        className={`w-full border px-4 py-2.5 text-sm rounded-md focus:outline-none focus:ring-1 bg-white transition-all placeholder:text-slate-400 ${
-          error
-            ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-            : "border-slate-300 focus:border-[#30364F] focus:ring-[#30364F]"
-        }`}
+        className={`w-full border px-4 py-2.5 text-sm rounded-md focus:outline-none focus:ring-1 bg-white transition-all placeholder:text-slate-400 ${error
+          ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+          : "border-slate-300 focus:border-[#30364F] focus:ring-[#30364F]"
+          }`}
       />
       {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
     </div>
@@ -107,6 +107,12 @@ export default function AuthView({
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState("")
+  const [forgotMessage, setForgotMessage] = useState("")
+  const [forgotLoading, setForgotLoading] = useState(false)
+
+
 
   const resetForm = () => {
     setFirstName("");
@@ -146,7 +152,7 @@ export default function AuthView({
       if (!email.trim()) {
         newErrors.email = "البريد الإلكتروني مطلوب";
       } else {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.com[^\s@]+$/;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email.trim())) {
           newErrors.email = "صيغة البريد الإلكتروني غير صحيحة";
         }
@@ -212,6 +218,18 @@ export default function AuthView({
       setLoading(false);
     }
   };
+
+  const handleForgotPassword = async () => {
+    try {
+      setForgotLoading(true)
+      await authService.forgotPassword(forgotEmail)
+      setForgotMessage("تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني")
+    } catch (error) {
+      setForgotMessage(error instanceof Error ? error.message : "حدث خطأ غير متوقع")
+    } finally {
+      setForgotLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-[calc(100vh-80px)] bg-[#f8fafc] flex items-center justify-center p-4">
@@ -317,7 +335,6 @@ export default function AuthView({
                   type="password"
                   error={errors.password}
                 />
-
                 <FormField
                   label="العنوان"
                   placeholder="المدينة، الحي، الشارع"
@@ -355,8 +372,20 @@ export default function AuthView({
                   type="password"
                   error={errors.password}
                 />
+
+                <div className="text-left">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-sm text-[#30364F] hover:underline font-bold"
+                  >
+                    نسيت كلمة المرور؟
+                  </button>
+                </div>
               </>
             )}
+
+
 
             <Button fullWidth variant="primary" className="mt-6 !py-3" disabled={loading}>
               {loading
@@ -364,8 +393,8 @@ export default function AuthView({
                   ? "جارٍ إنشاء الحساب..."
                   : "جارٍ تسجيل الدخول..."
                 : isRegister
-                ? "تسجيل حساب"
-                : "دخول"}
+                  ? "تسجيل حساب"
+                  : "دخول"}
             </Button>
           </form>
 
@@ -383,6 +412,54 @@ export default function AuthView({
           </div>
         </div>
       </div>
+      {/* 👇 Add modal here — outside all divs */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+            <h2 className="text-xl font-black text-[#30364F] mb-2">إعادة تعيين كلمة المرور</h2>
+            <p className="text-sm text-slate-500 mb-6">
+              أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين
+            </p>
+
+            {forgotMessage ? (
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-medium text-center mb-4">
+                {forgotMessage}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <FormField
+                  label="البريد الإلكتروني"
+                  placeholder="name@example.com"
+                  value={forgotEmail}
+                  onChange={setForgotEmail}
+                  type="email"
+                />
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={forgotLoading || !forgotEmail}
+                  className="w-full py-3 bg-[#91C6BC] text-[#213448] font-bold rounded-md hover:bg-[#7BB5AA] transition-colors disabled:opacity-50"
+                >
+                  {forgotLoading ? "جاري الإرسال..." : "إرسال رابط إعادة التعيين"}
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowForgotPassword(false)
+                setForgotEmail("")
+                setForgotMessage("")
+              }}
+              className="mt-4 w-full text-sm text-slate-500 hover:text-[#30364F] font-bold"
+            >
+              إغلاق
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
