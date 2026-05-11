@@ -28,6 +28,7 @@ type ParticipationModalProps = {
   onClose: () => void;
   onConfirm: () => void;
   walletBalance: number;
+  depositAmount: number;
 };
 
 export default function ParticipationModal({
@@ -35,6 +36,7 @@ export default function ParticipationModal({
   onClose,
   onConfirm,
   walletBalance,
+  depositAmount,
 }: ParticipationModalProps) {
   const [role, setRole] = useState<ParticipationRole>(null);
   const [agreed, setAgreed] = useState(false);
@@ -44,7 +46,7 @@ export default function ParticipationModal({
   const [agentConfirmed, setAgentConfirmed] = useState(false);
 
   const [step, setStep] = useState<1 | 2>(1);
-  const depositAmount = 5000;
+
 
   if (!isOpen) return null;
 

@@ -281,7 +281,7 @@ export default function BidHistoryPage() {
                       <Clock className="w-3 h-3" />
                       <span className="font-mono">
                         {item.end_time
-                          ? new Date(item.end_time).toLocaleDateString("ar-SA")
+                          ? new Date(item.end_time).toLocaleDateString("en-US")
                           : "—"}
                       </span>
                       {item.city && (
@@ -350,7 +350,7 @@ export default function BidHistoryPage() {
                             <div key={bid.bid_id} className="flex justify-between items-center bg-white rounded-lg p-3 text-sm">
                               <div>
                                 <span className="text-slate-600 font-mono text-xs block">
-                                  {new Date(bid.created_at).toLocaleString("ar-SA")}
+                                  {new Date(bid.created_at).toLocaleString("en-US")}
                                 </span>
                                 <span className="text-[10px] text-slate-400">مزايدة رقم {bid.bid_number}</span>
                               </div>

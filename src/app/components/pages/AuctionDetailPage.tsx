@@ -30,6 +30,7 @@ type AuctionDetailPageProps = {
   isFavorite: boolean;
   onToggleFavorite: () => void;
   selectedAuctionId: string | null;
+  isLoggedIn: boolean;
 };
 
 const Card = ({
@@ -57,10 +58,15 @@ export default function AuctionDetailPage({
   const [showAI, setShowAI] = useState(false);
   const [details, setDetails] = useState<PropertyDetails | null>(null);
   const [rawStartTime, setRawStartTime] = useState<string | null>(null);
-  const [rawEndTime, setRawEndTime]     = useState<string | null>(null);
+  const [rawEndTime, setRawEndTime] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLandRec, setShowLandRec] = useState(false);
+  const [targetPrice, setTargetPrice] = useState(0);
 
+const depositAmount =
+  targetPrice > 0
+    ? Math.ceil(targetPrice * 0.05)
+    : 50000;
   // AI analysis states
   const [analysis, setAnalysis] = useState<PricePredictionResult | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -86,6 +92,7 @@ export default function AuctionDetailPage({
           start_time,
           end_time,
           start_price,
+          target_price,
           highest_bid,
           duration,
           products_count,
@@ -121,42 +128,47 @@ export default function AuctionDetailPage({
       setDetails(PropertyDetails.fromJoinRow(data as PropertyJoinRow));
       setRawStartTime(data.start_time ?? null);
       setRawEndTime(data.end_time ?? null);
+      setTargetPrice(
+  Number(
+    String(data.target_price ?? "0").replace(/,/g, "")
+  )
+);
       setLoading(false);
     };
     fetchAuctionDetails();
   }, [selectedAuctionId]);
 
-      const isLand = details?.propertyType?.includes("أرض") ||
-      details?.usage?.includes("أرض") ||
-      details?.propertyType?.includes("قطعة");
+  const isLand = details?.propertyType?.includes("أرض") ||
+    details?.usage?.includes("أرض") ||
+    details?.propertyType?.includes("قطعة");
 
   // ── Auction status — use raw ISO timestamps, treat as Saudi time UTC+3 ────
   const now = new Date();
 
-const parseLocalTime = (t: string | null): Date | null => {
-  if (!t) return null
+  const parseLocalTime = (t: string | null): Date | null => {
+    if (!t) return null
 
-  // ISO format
-  if (t.includes("T") || t.includes("-")) {
-    const normalized = t.includes("+") || t.endsWith("Z") ? t : t + "+03:00"
-    return new Date(normalized)
+    // ISO format
+    if (t.includes("T") || t.includes("-")) {
+      const normalized = t.includes("+") || t.endsWith("Z") ? t : t + "+03:00"
+      return new Date(normalized)
+    }
+
+    // DD/MM/YYYY HH:MM or DD/MM/YYYY
+    const match = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/)
+    if (match) {
+      const [, day, month, year, hour = "23", min = "59"] = match
+      return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(min))
+    }
+
+    return null
   }
 
-  // DD/MM/YYYY HH:MM or DD/MM/YYYY
-  const match = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/)
-  if (match) {
-    const [, day, month, year, hour = "23", min = "59"] = match
-    return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(min))
-  }
-
-  return null
-}
-
-  const startTime  = parseLocalTime(rawStartTime);
-  const endTime    = parseLocalTime(rawEndTime);
-  const isEnded    = endTime   ? now > endTime   : false;
+  const startTime = parseLocalTime(rawStartTime);
+  const endTime = parseLocalTime(rawEndTime);
+  const isEnded = endTime ? now > endTime : false;
   const isUpcoming = startTime ? now < startTime : false;
-  const isLive     = !isEnded && !isUpcoming;
+  const isLive = !isEnded && !isUpcoming;
 
 
   // Fetch AI analysis once when panel first opens
@@ -269,10 +281,12 @@ const parseLocalTime = (t: string | null): Date | null => {
                     <MapPin className="w-4 h-4" /> {details.locationText}
                   </div>
                 </div>
-                <div className="text-left bg-slate-50 px-4 py-2 rounded-lg border border-slate-100">
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">السعر الحالي</div>
-                  <div className="text-2xl font-black text-[#30364F]">{details.currentPrice}</div>
-                </div>
+                {isLive && (
+                  <div className="text-left bg-slate-50 px-4 py-2 rounded-lg border border-slate-100">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">السعر الحالي</div>
+                    <div className="text-2xl font-black text-[#30364F]">{details.currentPrice}</div>
+                  </div>
+                )}
               </div>
 
               {/* Property specs */}
@@ -286,7 +300,7 @@ const parseLocalTime = (t: string | null): Date | null => {
                   ["رقم المخطط", details.planNumber],
                   ["الحي", details.district],
                   ["رقم القطعة", details.plotNumber],
-                  ["العربون", details.deposit],
+                  ["العربون", `${depositAmount.toLocaleString()} ر.س`],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between border-b border-dotted border-slate-200 pb-1">
                     <span className="text-slate-500">{label}</span>
@@ -295,7 +309,7 @@ const parseLocalTime = (t: string | null): Date | null => {
                 ))}
               </div>
 
-              
+
 
               {/* Action buttons */}
               <div className="flex flex-col gap-4 mt-8 pt-6 border-t border-slate-100">
@@ -345,6 +359,7 @@ const parseLocalTime = (t: string | null): Date | null => {
                     </div>
                   )}
 
+
                   {/* Participation button — only show for live auctions */}
                   {isLive && (
                     <Button
@@ -362,8 +377,9 @@ const parseLocalTime = (t: string | null): Date | null => {
                   )}
 
                   {isEnded && (
-                    <div className="flex-[2] min-h-[65px] flex items-center justify-center bg-slate-100 text-slate-400 font-bold rounded-xl border border-slate-200 text-sm">
-                      انتهى المزاد
+                    <div className="flex-[2] min-h-[65px] flex flex-col items-center justify-center bg-emerald-50 text-emerald-700 font-bold rounded-xl border border-emerald-200 text-sm gap-1">
+                      <span> تمت الترسيـة بقيمـة </span>
+                      <span className="text-lg font-black text-emerald-800">{details.currentPrice}</span>
                     </div>
                   )}
 

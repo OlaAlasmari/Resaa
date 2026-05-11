@@ -50,13 +50,75 @@ const RiskDots = ({ confidence }: { confidence: number }) => {
     </div>
   );
 };
+// ── Freeze Button ─────────────────────────────────────────────────────────────
+const FreezeButton = ({ nationalId }: { nationalId: string }) => {
+  const [isFrozen, setIsFrozen] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState("");
 
+  useEffect(() => {
+    const check = async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("is_frozen")
+        .eq("national_id", nationalId)
+        .single();
+      if (data) setIsFrozen(data.is_frozen ?? false);
+    };
+    check();
+  }, [nationalId]);
+
+  const toggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newState = !isFrozen;
+    await supabase
+      .from("profiles")
+      .update({ is_frozen: newState })
+      .eq("national_id", nationalId);
+    setIsFrozen(newState);
+    setModalMessage(newState ? "تم تجميد المزايد بنجاح" : "تم رفع التجميد بنجاح");
+    setShowModal(true);
+  };
+
+  return (
+    <>
+      <button
+        onClick={toggle}
+        className={`w-full mt-3 py-2 text-xs font-black text-white rounded-lg transition-colors ${
+          isFrozen
+            ? "bg-emerald-600 hover:bg-emerald-500"
+            : "bg-[#213448] hover:bg-[#2d4660]"
+        }`}>
+        {isFrozen ? "رفع التجميد" : "تجميد المزايد"}
+      </button>
+
+      {showModal && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl p-10 max-w-sm w-full text-center shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-[#91C6BC]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <ShieldCheck className="w-10 h-10 text-[#91C6BC]" strokeWidth={1.5} />
+            </div>
+            <h2 className="text-2xl font-black text-[#30364F] mb-2">{modalMessage}</h2>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowModal(false); }}
+              className="w-full py-3.5 bg-[#30364F] hover:bg-[#1e2538] text-white rounded-2xl font-bold text-sm transition-colors">
+              متابعة
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function NotificationsPage({ onNavigate }: NotificationsPageProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading]             = useState(true);
   const [expanded, setExpanded]           = useState<string | null>(null);
-  const [filter, setFilter]               = useState<"all" | "fraud" | "favorites">("all");
+  const [filter, setFilter] = useState<"all" | "fraud" | "favorites">("all");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // ── Load all notifications ────────────────────────────────────────────────────
   useEffect(() => {
@@ -66,14 +128,12 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
 
-      // Get user profile to check role
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
+//----------------admin fraud alerts --------------------
+const ADMIN_EMAIL = "elafbasmair209@gmail.com";
+const isAdmin = user.email === ADMIN_EMAIL;
+setIsAdmin(isAdmin);
+//--------------------------------------------------------
 
-      const isAdmin = profile?.role === "admin";
       const allNotifs: Notification[] = [];
 
       // ── 1. Fraud alerts (admin only) ───────────────────────────────────────
@@ -242,7 +302,7 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
       <div className="flex gap-2 mb-6">
         {[
           { key: "all",       label: "الكل" },
-          { key: "fraud",     label: "تنبيهات الاحتيال" },
+          ...(isAdmin ? [{ key: "fraud", label: "تنبيهات الاحتيال" }] : []),
           { key: "favorites", label: "المفضلة" },
         ].map(({ key, label }) => (
           <button key={key} onClick={() => setFilter(key as typeof filter)}
@@ -331,13 +391,12 @@ export default function NotificationsPage({ onNavigate }: NotificationsPageProps
                           <span className="text-slate-400">رقم الهوية</span>
                           <span className="font-bold text-[#30364F]">{notif.national_id}</span>
                         </div>
-                      )}
-                      <button className="w-full mt-3 py-2 text-xs font-black text-white bg-[#213448] rounded-lg hover:bg-[#2d4660] transition-colors">
-                        تجميد المزايد
-                      </button>
+           )}
+                      <FreezeButton nationalId={notif.national_id!} />
                     </div>
                   )}
 
+                  {/* Favorite auction actions */}
                   {/* Favorite auction actions */}
                   {(notif.type === "favorite_start" || notif.type === "favorite_end") && (
                     <div className="mt-3 flex gap-2">

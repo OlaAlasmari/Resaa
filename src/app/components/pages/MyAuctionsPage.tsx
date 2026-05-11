@@ -1,20 +1,8 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Gavel,
   Plus,
   Calendar,
-  ChevronDown,
-  Clock,
-  CheckCircle,
-  X,
-  Info,
-  CreditCard,
-  User,
-  Camera,
-  ShieldCheck,
-  ChevronLeft,
-  Check,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -26,6 +14,7 @@ import {
   Bar,
 } from "recharts";
 import { Badge } from "../ui/badge";
+import { supabase } from "../../../lib/supabase";
 
 const THEME = {
   textPrimary: "text-[#30364F]",
@@ -36,10 +25,126 @@ type MyAuctionsPageProps = {
   onAddAuction: () => void;
 };
 
+type AuctionRow = {
+  auction_id: number;
+  auction_name: string | null;
+  city: string | null;
+  district: string | null;
+  region: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  start_price: number | null;
+  highest_bid: number | null;
+  total_sales: number | null;
+  duration: string | null;
+  products_count: string | null;
+  time: string | null;
+  property_id: number | null;
+  user_id: string | null;
+};
+
 type CalendarWidgetProps = {
   onClose: () => void;
   onSelect: (date: string) => void;
   position?: "top" | "bottom";
+};
+
+const parseAuctionDate = (value?: string | null) => {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.includes("T") || trimmed.includes("-")) {
+    const date = new Date(trimmed);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  const dmyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmyMatch) {
+    const [, day, month, year] = dmyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const ymdMatch = trimmed.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  if (ymdMatch) {
+    const [, year, month, day] = ymdMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  return null;
+};
+
+const normalizeDateOnly = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const toDateInputValue = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const formatDate = (value?: string | null) => {
+  const date = parseAuctionDate(value);
+  if (!date) return "-";
+
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+
+  return `${y}-${m}-${d}`;
+};
+
+const formatMoney = (value?: number | null) => {
+  if (value === null || value === undefined) return "--";
+  return `${Number(value).toLocaleString("en-US")} ر.س`;
+};
+
+const getAuctionStatus = (
+  startTime?: string | null,
+  endTime?: string | null
+): "current" | "upcoming" | "ended" => {
+  const today = normalizeDateOnly(new Date());
+  const start = parseAuctionDate(startTime);
+  const end = parseAuctionDate(endTime);
+
+  if (!start) return "upcoming";
+
+  const startDate = normalizeDateOnly(start);
+  const endDate = end ? normalizeDateOnly(end) : startDate;
+
+  if (today < startDate) return "upcoming";
+  if (today > endDate) return "ended";
+  return "current";
+};
+
+const isSameSelectedDay = (value: string | null, selectedDate: string) => {
+  if (!selectedDate) return true;
+
+  const date = parseAuctionDate(value);
+  if (!date) return false;
+
+  return toDateInputValue(date) === selectedDate;
+};
+
+const monthNameAr = (monthIndex: number) => {
+  const months = [
+    "يناير",
+    "فبراير",
+    "مارس",
+    "أبريل",
+    "مايو",
+    "يونيو",
+    "يوليو",
+    "أغسطس",
+    "سبتمبر",
+    "أكتوبر",
+    "نوفمبر",
+    "ديسمبر",
+  ];
+
+  return months[monthIndex] ?? "-";
 };
 
 const CalendarWidget = ({
@@ -47,9 +152,10 @@ const CalendarWidget = ({
   onSelect,
   position = "bottom",
 }: CalendarWidgetProps) => {
-  const [selectedDay, setSelectedDay] = useState(15);
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(0);
+  const today = new Date();
+  const [selectedDay, setSelectedDay] = useState(today.getDate());
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
 
   const months = [
     "January",
@@ -109,7 +215,10 @@ const CalendarWidget = ({
 
       <div className="grid grid-cols-7 mb-2 text-center">
         {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-          <div key={i} className="text-[10px] font-bold text-slate-400 uppercase py-1">
+          <div
+            key={i}
+            className="text-[10px] font-bold text-slate-400 uppercase py-1"
+          >
             {d}
           </div>
         ))}
@@ -138,9 +247,9 @@ const CalendarWidget = ({
       <button
         onClick={() => {
           onSelect(
-            `${currentYear}-${(currentMonth + 1).toString().padStart(2, "0")}-${selectedDay
+            `${currentYear}-${(currentMonth + 1)
               .toString()
-              .padStart(2, "0")}`
+              .padStart(2, "0")}-${selectedDay.toString().padStart(2, "0")}`
           );
           onClose();
         }}
@@ -184,21 +293,127 @@ const Card = ({
 export default function MyAuctionsPage({
   onAddAuction,
 }: MyAuctionsPageProps) {
-  const performanceData = [
-    { name: "يناير", value: 4000 },
-    { name: "فبراير", value: 3000 },
-    { name: "مارس", value: 2000 },
-    { name: "أبريل", value: 2780 },
-    { name: "مايو", value: 1890 },
-  ];
-
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
+  const [auctions, setAuctions] = useState<AuctionRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadMyAuctions = async () => {
+      try {
+        setLoading(true);
+
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          setAuctions([]);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("auction")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("auction_id", { ascending: false });
+
+        if (error) {
+          console.error("Error loading my auctions:", error.message);
+          setAuctions([]);
+          return;
+        }
+
+        setAuctions((data as AuctionRow[]) || []);
+      } catch (error) {
+        console.error("Unexpected dashboard error:", error);
+        setAuctions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMyAuctions();
+  }, []);
+
+  const filteredAuctions = useMemo(() => {
+    return auctions.filter((auction) =>
+      isSameSelectedDay(auction.start_time, selectedDate)
+    );
+  }, [auctions, selectedDate]);
+
+  const performanceData = useMemo(() => {
+    const map = new Map<string, number>();
+
+    auctions.forEach((auction) => {
+      const date = parseAuctionDate(auction.start_time);
+      if (!date) return;
+
+      const month = monthNameAr(date.getMonth());
+      const value = Number(
+        auction.total_sales ?? auction.highest_bid ?? auction.start_price ?? 0
+      );
+
+      map.set(month, (map.get(month) ?? 0) + value);
+    });
+
+    return Array.from(map.entries()).map(([name, value]) => ({
+      name,
+      value,
+    }));
+  }, [auctions]);
+
+  const totalAuctions = filteredAuctions.length;
+
+  const totalSales = filteredAuctions.reduce(
+    (sum, auction) =>
+      sum +
+      Number(auction.total_sales ?? auction.highest_bid ?? auction.start_price ?? 0),
+    0
+  );
+
+  const averagePrice =
+    totalAuctions > 0 ? Math.round(totalSales / totalAuctions) : 0;
+
+  const highestAuction = filteredAuctions.reduce<AuctionRow | null>(
+    (highest, auction) => {
+      if (!highest) return auction;
+
+      const auctionValue = Number(
+        auction.total_sales ?? auction.highest_bid ?? auction.start_price ?? 0
+      );
+      const highestValue = Number(
+        highest.total_sales ?? highest.highest_bid ?? highest.start_price ?? 0
+      );
+
+      return auctionValue > highestValue ? auction : highest;
+    },
+    null
+  );
+
+  const lowestAuction = filteredAuctions.reduce<AuctionRow | null>(
+    (lowest, auction) => {
+      if (!lowest) return auction;
+
+      const auctionValue = Number(
+        auction.total_sales ?? auction.highest_bid ?? auction.start_price ?? 0
+      );
+      const lowestValue = Number(
+        lowest.total_sales ?? lowest.highest_bid ?? lowest.start_price ?? 0
+      );
+
+      return auctionValue < lowestValue ? auction : lowest;
+    },
+    null
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 animate-in fade-in space-y-8">
       <div className="flex justify-between items-center">
-        <h1 className={`text-2xl font-black ${THEME.textPrimary} flex items-center gap-2`}>
+        <h1
+          className={`text-2xl font-black ${THEME.textPrimary} flex items-center gap-2`}
+        >
           <Gavel className="w-6 h-6" /> مزاداتي
         </h1>
 
@@ -251,32 +466,38 @@ export default function MyAuctionsPage({
           <div className="grid grid-cols-2 gap-4 h-full">
             <div className="bg-slate-50 p-4 rounded-lg flex flex-col justify-center items-center text-center border border-slate-100">
               <span className="text-slate-500 text-xs font-bold mb-2">
-                إجمالي المزايدات
+                إجمالي المزادات
               </span>
-              <span className="text-3xl font-black text-[#30364F]">48</span>
+              <span className="text-3xl font-black text-[#30364F]">
+                {totalAuctions}
+              </span>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-lg flex flex-col justify-center items-center text-center border border-slate-100">
               <span className="text-slate-500 text-xs font-bold mb-2">
-                متوسط المزايدة/مزاد
+                متوسط قيمة المزاد
               </span>
-              <span className="text-3xl font-black text-[#30364F]">12.5</span>
+              <span className="text-lg font-black text-[#30364F]">
+                {formatMoney(averagePrice)}
+              </span>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-lg flex flex-col justify-center items-center text-center border border-slate-100">
               <span className="text-slate-500 text-xs font-bold mb-2">
-                أعلى تنافس
+                أعلى مزاد
               </span>
               <span className="text-sm font-black text-[#30364F]">
-                فيلا القيروان (22)
+                {highestAuction?.auction_name ?? "--"}
               </span>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-lg flex flex-col justify-center items-center text-center border border-slate-100">
               <span className="text-slate-500 text-xs font-bold mb-2">
-                أقل من التوقع
+                أقل مزاد
               </span>
-              <span className="text-sm font-black text-rose-600">أرض الملقا</span>
+              <span className="text-sm font-black text-rose-600">
+                {lowestAuction?.auction_name ?? "--"}
+              </span>
             </div>
           </div>
         </Card>
@@ -305,7 +526,9 @@ export default function MyAuctionsPage({
         </div>
 
         <table className="w-full text-right text-sm">
-          <thead className={`bg-slate-50 ${THEME.textPrimary} font-bold border-b ${THEME.border}`}>
+          <thead
+            className={`bg-slate-50 ${THEME.textPrimary} font-bold border-b ${THEME.border}`}
+          >
             <tr>
               <th className="p-4">عنوان المزاد</th>
               <th className="p-4">تاريخ البدء</th>
@@ -317,29 +540,74 @@ export default function MyAuctionsPage({
           </thead>
 
           <tbody className="divide-y divide-slate-100">
-            <tr className="hover:bg-slate-50">
-              <td className="p-4 font-bold">أرض خام - مخطط الخير</td>
-              <td className="p-4 text-slate-500">2025-11-20</td>
-              <td className="p-4 text-slate-500">2025-12-01</td>
-              <td className="p-4">42</td>
-              <td className="p-4 font-mono font-bold text-[#30364F]">
-                3,450,000 ر.س
-              </td>
-              <td className="p-4">
-                <Badge variant="success">مكتمل</Badge>
-              </td>
-            </tr>
+            {loading ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="p-8 text-center text-slate-500 font-bold"
+                >
+                  جاري تحميل البيانات...
+                </td>
+              </tr>
+            ) : filteredAuctions.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="p-8 text-center text-slate-500 font-bold"
+                >
+                  لا توجد مزادات لهذا المستخدم
+                </td>
+              </tr>
+            ) : (
+              filteredAuctions.map((auction) => {
+                const status = getAuctionStatus(
+                  auction.start_time,
+                  auction.end_time
+                );
 
-            <tr className="hover:bg-slate-50">
-              <td className="p-4 font-bold">فيلا العارض</td>
-              <td className="p-4 text-slate-500">2026-02-01</td>
-              <td className="p-4 text-slate-500">2026-02-15</td>
-              <td className="p-4">15</td>
-              <td className="p-4 font-mono font-bold text-[#30364F]">--</td>
-              <td className="p-4">
-                <Badge variant="warning">جاري</Badge>
-              </td>
-            </tr>
+                return (
+                  <tr key={auction.auction_id} className="hover:bg-slate-50">
+                    <td className="p-4 font-bold">
+                      {auction.auction_name ?? "مزاد بدون اسم"}
+                    </td>
+
+                    <td className="p-4 text-slate-500">
+                      {formatDate(auction.start_time)}
+                    </td>
+
+                    <td className="p-4 text-slate-500">
+                      {formatDate(auction.end_time)}
+                    </td>
+
+                    <td className="p-4">
+                      {auction.products_count ?? "1 منتج"}
+                    </td>
+
+                    <td className="p-4 font-mono font-bold text-[#30364F]">
+                      {formatMoney(
+                        auction.total_sales ??
+                          auction.highest_bid ??
+                          auction.start_price
+                      )}
+                    </td>
+
+                    <td className="p-4">
+                      {status === "ended" && (
+                        <Badge variant="success">مكتمل</Badge>
+                      )}
+
+                      {status === "current" && (
+                        <Badge variant="warning">جاري</Badge>
+                      )}
+
+                      {status === "upcoming" && (
+                        <Badge variant="neutral">قادم</Badge>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </Card>

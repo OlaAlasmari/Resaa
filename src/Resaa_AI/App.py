@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import numpy as np
 import pandas as pd
-from catboost import CatBoostRegressor, Pool
+from catboost import CatBoostRegressor, CatBoostClassifier, Pool
 from datetime import datetime
 import math
 import json
@@ -427,6 +427,45 @@ def neighborhoods():
 def health():
     return jsonify({"status": "ok"})
 
+# ── Fraud Detection Model ─────────────────────────────────────────────────────
+fraud_model = CatBoostClassifier()
+fraud_model.load_model("src/Resaa_AI/models/fraud_model.cbm")
+
+with open("src/Resaa_AI/models/fraud_model_meta.json", "r", encoding="utf-8") as f:
+    fraud_meta = json.load(f)
+
+FRAUD_FEATURES      = fraud_meta["features"]
+FRAUD_EXPLANATIONS  = fraud_meta["feature_explanations"]
+
+@app.route("/detect-fraud", methods=["POST"])
+def detect_fraud():
+    try:
+        data = request.get_json()
+        row  = {f: float(data.get(f, 0)) for f in FRAUD_FEATURES}
+        X    = pd.DataFrame([row])
+
+        proba      = fraud_model.predict_proba(X)[0][1]
+        confidence = round(float(proba) * 100, 1)
+
+        if confidence < 40:
+            return jsonify({"fraud": False, "confidence": confidence})
+
+        risk_level = "HIGH" if confidence >= 70 else "MEDIUM"
+
+        reasons = [explanation for feat, explanation in FRAUD_EXPLANATIONS.items() if feat in data]
+
+        return jsonify({
+            "fraud":      True,
+            "confidence": confidence,
+            "risk_level": risk_level,
+            "reasons":    " | ".join(reasons[:4]),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

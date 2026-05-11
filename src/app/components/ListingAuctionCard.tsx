@@ -237,14 +237,9 @@ export default function ListingAuctionCard({
       {/* Footer */}
       <div className="p-4 flex justify-between items-center bg-slate-50 border-t border-slate-100">
 
-        {/* Hide details button for ended auctions */}
-        {status !== "ended" ? (
-          <Button className="!w-32 !py-2 !rounded-md">
-            التفاصيل
-          </Button>
-        ) : (
-          <div />
-        )}
+        <Button className="!w-32 !py-2 !rounded-md">
+          التفاصيل
+        </Button>
 
         <div className="flex items-center gap-2 opacity-80">
           <div className="text-right">

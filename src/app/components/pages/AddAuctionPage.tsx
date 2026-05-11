@@ -4,6 +4,7 @@ import { Button } from "../ui/button";
 import InputField from "../InputField";
 import { SellerRole } from "../../types";
 import { supabase } from "../../../lib/supabase";
+import { SAUDI_LOCATIONS } from "../saudiLocations";
 
 const THEME = {
   primary: "bg-[#91C6BC]",
@@ -43,12 +44,15 @@ type CalendarWidgetProps = {
 };
 
 const CalendarWidget = ({ onClose, onSelect, position = "bottom" }: CalendarWidgetProps) => {
-  const [selectedDay, setSelectedDay] = useState(15);
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(0);
 
-  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  const years = Array.from({ length: 80 }, (_, i) => 1950 + i);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const [selectedDay, setSelectedDay] = useState(today.getDate());
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
+
+  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const years = Array.from({ length: 10 }, (_, i) => today.getFullYear() + i);
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const startDay = new Date(currentYear, currentMonth, 1).getDay();
   const positionClasses = position === "top" ? "bottom-full mb-2 origin-bottom-left" : "top-full mt-2 origin-top-left";
@@ -67,21 +71,31 @@ const CalendarWidget = ({ onClose, onSelect, position = "bottom" }: CalendarWidg
       </div>
 
       <div className="grid grid-cols-7 mb-2 text-center">
-        {["S","M","T","W","T","F","S"].map((d, i) => (
+        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
           <div key={i} className="text-[10px] font-bold text-slate-400 uppercase py-1">{d}</div>
         ))}
       </div>
 
       <div className="grid grid-cols-7 gap-1 mb-4">
         {Array.from({ length: startDay }).map((_, i) => <div key={`e-${i}`} />)}
-        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => (
-          <button key={day} onClick={() => setSelectedDay(day)}
-            className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all mx-auto ${
-              selectedDay === day ? "bg-[#30364F] text-white shadow-md shadow-slate-200" : "text-slate-600 hover:bg-slate-50 hover:text-[#30364F]"
-            }`}>
-            {day}
-          </button>
-        ))}
+        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
+          const thisDate = new Date(currentYear, currentMonth, day);
+          const isPast = thisDate < today;
+          return (
+            <button
+              key={day}
+              onClick={() => !isPast && setSelectedDay(day)}
+              disabled={isPast}
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all mx-auto ${isPast
+                ? "text-slate-200 cursor-not-allowed"
+                : selectedDay === day
+                  ? "bg-[#30364F] text-white shadow-md shadow-slate-200"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-[#30364F]"
+                }`}>
+              {day}
+            </button>
+          );
+        })}
       </div>
 
       <button
@@ -179,9 +193,8 @@ const TimeColumn = ({
               setTimeout(() => { settling.current = false; }, 300);
             }}
           >
-            <span className={`font-bold transition-all duration-150 ${
-              item === selected ? "text-[#30364F] text-base" : "text-slate-300 text-sm"
-            }`}>
+            <span className={`font-bold transition-all duration-150 ${item === selected ? "text-[#30364F] text-base" : "text-slate-300 text-sm"
+              }`}>
               {format ? format(item as number) : String(item)}
             </span>
           </div>
@@ -205,9 +218,9 @@ const ScrollTimePicker = ({
   onChange: (v: TimeVal) => void;
   onClose: () => void;
 }) => {
-  const hours   = Array.from({ length: 12 }, (_, i) => i + 1);
+  const hours = Array.from({ length: 12 }, (_, i) => i + 1);
   const minutes = Array.from({ length: 60 }, (_, i) => i);
-  const periods: ("AM" | "PM")[] = ["AM", "PM"];
+  const periods: ("ص" | "م")[] = ["ص", "م"];
 
   return (
     <div className="absolute top-full mt-2 left-0 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 w-[200px] overflow-hidden animate-in zoom-in-95 duration-200">
@@ -262,7 +275,7 @@ type DateTimeFieldProps = {
 };
 
 const DateTimeField = ({ label, dateValue, timeValue, onDateChange, onTimeChange }: DateTimeFieldProps) => {
-  const [showCal, setShowCal]   = useState(false);
+  const [showCal, setShowCal] = useState(false);
   const [showTime, setShowTime] = useState(false);
   const formatTime = (t: TimeVal) =>
     `${String(t.hour).padStart(2, "0")}:${String(t.minute).padStart(2, "0")} ${t.period}`;
@@ -392,21 +405,21 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const [targetPrice, setTargetPrice]     = useState("");
+  const [targetPrice, setTargetPrice] = useState("");
   const [strategyLoading, setStrategyLoading] = useState(false);
-  const [strategyResult, setStrategyResult]   = useState<AuctionStrategyResponse | null>(null);
-  const [strategyError, setStrategyError]     = useState<string | null>(null);
+  const [strategyResult, setStrategyResult] = useState<AuctionStrategyResponse | null>(null);
+  const [strategyError, setStrategyError] = useState<string | null>(null);
 
   const propertyImageInputRef = useRef<HTMLInputElement | null>(null);
-  const deedFileInputRef      = useRef<HTMLInputElement | null>(null);
+  const deedFileInputRef = useRef<HTMLInputElement | null>(null);
   const [propertyImageFile, setPropertyImageFile] = useState<File | null>(null);
-  const [deedFile, setDeedFile]                   = useState<File | null>(null);
+  const [deedFile, setDeedFile] = useState<File | null>(null);
 
   const defaultTime: TimeVal = { hour: 9, minute: 0, period: "AM" };
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState<TimeVal>(defaultTime);
-  const [endDate, setEndDate]     = useState("");
-  const [endTime, setEndTime]     = useState<TimeVal>({ hour: 9, minute: 0, period: "AM" });
+  const [endDate, setEndDate] = useState("");
+  const [endTime, setEndTime] = useState<TimeVal>({ hour: 9, minute: 0, period: "AM" });
 
   const [form, setForm] = useState({
     fullName: currentUser?.name ?? "", nationalId: currentUser?.nationalId ?? "", agencyNumber: "", agencyExpiry: "", agencyPlace: "",
@@ -463,8 +476,8 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
     updateForm("startPrice", String(strategy.recommended_start_price));
     const timeMap: Record<string, TimeVal> = {
       "9:00 AM - 11:00 AM": { hour: 9, minute: 0, period: "AM" },
-      "1:00 PM - 4:00 PM":  { hour: 1, minute: 0, period: "PM" },
-      "5:00 PM - 9:00 PM":  { hour: 5, minute: 0, period: "PM" },
+      "1:00 PM - 4:00 PM": { hour: 1, minute: 0, period: "PM" },
+      "5:00 PM - 9:00 PM": { hour: 5, minute: 0, period: "PM" },
     };
     const mapped = timeMap[strategy.recommended_time_range];
     if (mapped) setStartTime(mapped);
@@ -505,6 +518,15 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
       if (propertyImageFile) propertyImageUrl = await uploadFileToBucket("property-images", propertyImageFile, "auctions");
       if (propertyImageFile && !propertyImageUrl) { alert("فشل رفع صورة العقار"); return; }
       if (deedFile) { const u = await uploadFileToBucket("deed-files", deedFile, "deeds"); if (!u) { alert("فشل رفع وثيقة الملكية"); return; } }
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        alert("يجب تسجيل الدخول لإضافة مزاد");
+        return;
+      }
 
       const { data: propertyData, error: propertyError } = await supabase.from("property").insert({
         property_type: form.propertyType || null, city: form.city || null, district: form.district || null,
@@ -517,8 +539,8 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
 
       if (propertyError) { console.error("Property insert error:", propertyError.message); alert("حدث خطأ أثناء حفظ بيانات العقار"); return; }
 
-      const startDT  = toDatetimeString(startDate, startTime);
-      const endDT    = toDatetimeString(endDate, endTime);
+      const startDT = toDatetimeString(startDate, startTime);
+      const endDT = toDatetimeString(endDate, endTime);
       const diffDays = Math.ceil((new Date(endDT).getTime() - new Date(startDT).getTime()) / (1000 * 60 * 60 * 24));
 
       const { error: auctionError } = await supabase.from("auction").insert({
@@ -535,6 +557,7 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
         area: form.area ? Number(form.area) : null,
         // AI model output — target price the seller wants to achieve
         target_price: targetPrice ? Number(targetPrice) : null,
+        user_id: user.id,
       });
 
       if (auctionError) { console.error("Auction insert error:", auctionError); alert(auctionError.message || "حدث خطأ أثناء إضافة المزاد"); return; }
@@ -553,9 +576,8 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
       <div className="flex items-center justify-center mb-10">
         {[1, 2, 3, 4].map((s) => (
           <div key={s} className="flex items-center">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold transition-colors ${
-              step >= s ? `${THEME.primary} border-transparent text-white` : "bg-white border-slate-300 text-slate-300"
-            }`}>{s}</div>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold transition-colors ${step >= s ? `${THEME.primary} border-transparent text-white` : "bg-white border-slate-300 text-slate-300"
+              }`}>{s}</div>
             {s < 4 && <div className={`w-16 h-0.5 mx-2 ${step > s ? "bg-[#30364F]" : "bg-slate-200"}`} />}
           </div>
         ))}
@@ -566,52 +588,174 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
         {/* ── Step 1 ── */}
         {step === 1 && (
           <div className="space-y-6">
-            <h3 className="font-bold text-lg border-b pb-2 mb-4">بيانات البائع</h3>
+            <h3 className="font-bold text-lg border-b pb-2 mb-4">
+              بيانات البائع
+            </h3>
+
+            {/* Role Selection */}
             <div className="grid grid-cols-3 gap-4 mb-6">
-              {["principal","agent","marketer"].map((role) => (
-                <button key={role} onClick={() => setSellerRole(role as SellerRole)}
-                  className={`p-3 border rounded-lg text-center transition-all font-bold text-sm ${
-                    sellerRole === role ? "bg-[#30364F] text-white border-[#30364F]" : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
-                  }`}>
-                  {role === "principal" ? "أصيل" : role === "agent" ? "وكيل" : "مسوق"}
+              {["principal", "agent", "marketer"].map((role) => (
+                <button
+                  key={role}
+                  onClick={() => setSellerRole(role as SellerRole)}
+                  className={`p-3 border rounded-lg text-center transition-all font-bold text-sm ${sellerRole === role
+                    ? "bg-[#30364F] text-white border-[#30364F]"
+                    : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+                    }`}
+                >
+                  {role === "principal"
+                    ? "أصيل"
+                    : role === "agent"
+                      ? "وكيل"
+                      : "مسوق"}
                 </button>
               ))}
             </div>
+
             <div className="space-y-4">
-              <InputField label="الاسم الكامل" placeholder="" value={form.fullName} onChange={(e) => updateForm("fullName", e.target.value)} />
+              {/* Full Name */}
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-[#30364F]">رقم الهوية / السجل</label>
-                <input type="text" maxLength={10} value={form.nationalId}
-                  onChange={(e) => updateForm("nationalId", e.target.value.replace(/[^0-9]/g,"").slice(0,10))}
-                  placeholder="1xxxxxxxxx"
-                  className="w-full border border-slate-300 px-4 py-2.5 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all placeholder:text-slate-400" />
+                <label className="text-sm font-bold text-[#30364F]">
+                  الاسم الكامل
+                </label>
+                <input
+                  type="text"
+                  value={form.fullName}
+                  readOnly
+                  className="w-full border border-slate-200 px-4 py-2.5 text-sm rounded-md bg-slate-50 text-slate-400 cursor-not-allowed"
+                />
               </div>
+
+              {/* National ID */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-[#30364F]">
+                  رقم الهوية / السجل
+                </label>
+                <input
+                  type="text"
+                  value={form.nationalId}
+                  readOnly
+                  className="w-full border border-slate-200 px-4 py-2.5 text-sm rounded-md bg-slate-50 text-slate-400 cursor-not-allowed"
+                />
+              </div>
+
+              {/* ── Agent Fields ── */}
               {sellerRole === "agent" && (
                 <>
-                  <InputField label="رقم الوكالة الشرعية" placeholder="xxxxxxxx" value={form.agencyNumber} onChange={(e) => updateForm("agencyNumber", e.target.value)} />
+                  {/* Agency Number */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-[#30364F]">
+                      رقم الوكالة الشرعية
+                    </label>
+
+                    <input
+                      type="text"
+                      maxLength={15}
+                      value={form.agencyNumber}
+                      onChange={(e) =>
+                        updateForm(
+                          "agencyNumber",
+                          e.target.value.replace(/[^0-9/]/g, "").replace(/\/+/g, "/")
+                        )
+                      }
+                      placeholder="مثال: 45382917/1446"
+                      className="w-full border border-slate-300 px-4 py-2.5 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white"
+                    />
+                  </div>
+
+                  {/* Agency Expiry */}
                   <div className="space-y-1.5 relative">
-                    <label className="text-sm font-bold text-[#30364F]">تاريخ انتهاء الوكالة</label>
-                    <div className="relative" onClick={() => setShowCalendar(!showCalendar)}>
-                      <input type="text" value={form.agencyExpiry} readOnly placeholder=""
-                        className="w-full border border-slate-300 px-4 py-2.5 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all cursor-pointer" />
-                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <label className="text-sm font-bold text-[#30364F]">
+                      تاريخ انتهاء الوكالة
+                    </label>
+
+                    <div
+                      className="relative"
+                      onClick={() => setShowCalendar(!showCalendar)}
+                    >
+                      <input
+                        type="text"
+                        value={form.agencyExpiry}
+                        readOnly
+                        className="w-full border border-slate-300 px-4 py-2.5 text-sm rounded-md bg-white cursor-pointer"
+                      />
+                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     </div>
+
                     {showCalendar && (
-                      <CalendarWidget onClose={() => setShowCalendar(false)}
-                        onSelect={(d) => { updateForm("agencyExpiry", d); setShowCalendar(false); }} position="top" />
+                      <CalendarWidget
+                        onClose={() => setShowCalendar(false)}
+                        onSelect={(d) => {
+                          updateForm("agencyExpiry", d);
+                          setShowCalendar(false);
+                        }}
+                        position="top"
+                      />
                     )}
                   </div>
-                  <InputField label="مكان إنشاء الوكالة" placeholder="الرياض" value={form.agencyPlace} onChange={(e) => updateForm("agencyPlace", e.target.value)} />
+
+                  {/* Agency Place */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-[#30364F]">
+                      مكان إنشاء الوكالة
+                    </label>
+
+                    <div className="relative">
+                      <select
+                        value={form.agencyPlace}
+                        onChange={(e) => updateForm("agencyPlace", e.target.value)}
+                        className="w-full border border-slate-300 px-4 py-2.5 pr-10 text-sm rounded-md bg-white appearance-none"
+                      >
+                        <option value="">اختر المنطقة</option>
+                        {Object.keys(SAUDI_LOCATIONS).map((region) => (
+                          <option key={region} value={region}>
+                            {region}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </>
               )}
+
+              {/* ── Marketer Fields ── */}
               {sellerRole === "marketer" && (
                 <>
-                  <InputField label="رقم رخصة فال" placeholder="1100xxxxxx" value={form.falLicense} onChange={(e) => updateForm("falLicense", e.target.value)} />
-                  <InputField label="اسم المنشأة" placeholder="" value={form.companyName} onChange={(e) => updateForm("companyName", e.target.value)} />
+                  <input
+                    type="text"
+                    maxLength={10}
+                    value={form.falLicense}
+                    onChange={(e) =>
+                      updateForm(
+                        "falLicense",
+                        e.target.value.replace(/[^0-9]/g, "") // numbers only
+                      )
+                    }
+                    placeholder="1100xxxxxx"
+                    className="w-full border border-slate-300 px-4 py-2.5 text-sm rounded-md
+    focus:border-[#30364F] focus:outline-none focus:ring-1
+    focus:ring-[#30364F] bg-white transition-all placeholder:text-slate-400"
+                  />
+
+                  <InputField
+                    label="اسم المنشأة"
+                    placeholder=""
+                    value={form.companyName}
+                    onChange={(e) => updateForm("companyName", e.target.value)}
+                  />
                 </>
               )}
             </div>
-            <Button fullWidth onClick={() => { if (validateStepOne()) setStep(2); }} className="mt-4">التالي</Button>
+
+            <Button
+              fullWidth
+              onClick={() => {
+                if (validateStepOne()) setStep(2);
+              }}
+              className="mt-4"
+            >
+              التالي
+            </Button>
           </div>
         )}
 
@@ -620,17 +764,127 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
           <div className="space-y-6">
             <h3 className="font-bold text-lg border-b pb-2 mb-4">بيانات العقار</h3>
             <div className="grid grid-cols-2 gap-4">
-              <InputField label="نوع العقار" placeholder="أرض، فيلا، عمارة..." value={form.propertyType} onChange={(e) => updateForm("propertyType", e.target.value)} />
-              <InputField label="الاستخدام" placeholder="سكني، تجاري..." value={form.usage} onChange={(e) => updateForm("usage", e.target.value)} />
+
+              {/* نوع العقار */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-[#30364F]">نوع العقار</label>
+                <div className="relative">
+                  <select value={form.propertyType} onChange={(e) => updateForm("propertyType", e.target.value)}
+                    className="w-full border border-slate-300 px-4 py-2.5 pr-10 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all text-[#30364F] appearance-none cursor-pointer">
+                    <option value="">اختر نوع العقار</option>
+                    <option value="أرض">أرض</option>
+                    <option value="فيلا">فيلا</option>
+                    <option value="شقة">شقة</option>
+                    <option value="عمارة">عمارة</option>
+                    <option value="مبنى تجاري">مبنى تجاري</option>
+                    <option value="محل تجاري">محل تجاري</option>
+                    <option value="مكتب">مكتب</option>
+                  </select>
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* الاستخدام */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-[#30364F]">الاستخدام</label>
+                <div className="relative">
+                  <select value={form.usage} onChange={(e) => updateForm("usage", e.target.value)}
+                    className="w-full border border-slate-300 px-4 py-2.5 pr-10 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all text-[#30364F] appearance-none cursor-pointer">
+                    <option value="">اختر الاستخدام</option>
+                    <option value="سكني">سكني</option>
+                    <option value="تجاري">تجاري</option>
+                    <option value="زراعي">زراعي</option>
+                    <option value="صناعي">صناعي</option>
+                  </select>
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* المساحة */}
               <InputField label="المساحة (م²)" placeholder="0.00" type="number" value={form.area} onChange={(e) => updateForm("area", e.target.value)} />
-              <InputField label="واجهة العقار" placeholder="شمالية، جنوبية..." value={form.facade} onChange={(e) => updateForm("facade", e.target.value)} />
-              <InputField label="المدينة" placeholder="" value={form.city} onChange={(e) => updateForm("city", e.target.value)} />
+
+              {/* واجهة العقار */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-[#30364F]">واجهة العقار</label>
+                <div className="relative">
+                  <select value={form.facade} onChange={(e) => updateForm("facade", e.target.value)}
+                    className="w-full border border-slate-300 px-4 py-2.5 pr-10 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all text-[#30364F] appearance-none cursor-pointer">
+                    <option value="">اختر الواجهة</option>
+                    <option value="شمالية">شمالية</option>
+                    <option value="جنوبية">جنوبية</option>
+                    <option value="شرقية">شرقية</option>
+                    <option value="غربية">غربية</option>
+                    <option value="شمالية شرقية">شمالية شرقية</option>
+                    <option value="شمالية غربية">شمالية غربية</option>
+                    <option value="جنوبية شرقية">جنوبية شرقية</option>
+                    <option value="جنوبية غربية">جنوبية غربية</option>
+                  </select>
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* المنطقة */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-[#30364F]">المنطقة</label>
+                <div className="relative">
+                  <select value={form.region} onChange={(e) => { updateForm("region", e.target.value); updateForm("city", ""); }}
+                    className="w-full border border-slate-300 px-4 py-2.5 pr-10 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all text-[#30364F] appearance-none cursor-pointer">
+                    <option value="">اختر المنطقة</option>
+                    {Object.keys(SAUDI_LOCATIONS).map((region) => (
+                      <option key={region} value={region}>{region}</option>
+                    ))}
+                  </select>
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* المدينة */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-[#30364F]">المدينة</label>
+                <div className="relative">
+                  <select value={form.city} onChange={(e) => updateForm("city", e.target.value)}
+                    disabled={!form.region}
+                    className="w-full border border-slate-300 px-4 py-2.5 pr-10 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all text-[#30364F] appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400">
+                    <option value="">اختر المدينة</option>
+                    {(SAUDI_LOCATIONS[form.region] ?? []).map((city) => (
+                      <option key={city} value={city}>{city}</option>
+                    ))}
+                  </select>
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* الحي */}
               <InputField label="الحي" placeholder="" value={form.district} onChange={(e) => updateForm("district", e.target.value)} />
-              <InputField label="المنطقة" placeholder="مثال: مكة المكرمة، الرياض..." value={form.region} onChange={(e) => updateForm("region", e.target.value)} />
+
+              {/* اسم الشارع */}
               <InputField label="اسم الشارع" placeholder="" value={form.streetName} onChange={(e) => updateForm("streetName", e.target.value)} />
+              {/* رابط الموقع */}
               <div className="col-span-2">
                 <InputField label="رابط الموقع (Google Maps)" placeholder="https://maps.google.com/..." value={form.mapUrl} onChange={(e) => updateForm("mapUrl", e.target.value)} />
               </div>
+
+              {/* صورة العقار */}
               <div className="col-span-2 space-y-2">
                 <label className="text-sm font-bold text-[#30364F]">صورة العقار</label>
                 <input ref={propertyImageInputRef} type="file" accept="image/*" className="hidden"
@@ -643,6 +897,8 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
                   </span>
                 </div>
               </div>
+
+              {/* الحدود والأطوال */}
               <div className="col-span-2">
                 <h4 className="text-sm font-bold text-[#30364F] mb-2 mt-2">الحدود والأطوال (بالمتر)</h4>
                 <div className="grid grid-cols-2 gap-4">
@@ -652,6 +908,7 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
                   <InputField label="غرباً" placeholder="0.00" type="number" value={form.westBoundary} onChange={(e) => updateForm("westBoundary", e.target.value)} />
                 </div>
               </div>
+
             </div>
             <div className="flex gap-4 pt-4">
               <Button variant="outline" onClick={() => setStep(1)} className="flex-1">السابق</Button>
@@ -660,39 +917,178 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
           </div>
         )}
 
+
         {/* ── Step 3 ── */}
         {step === 3 && (
           <div className="space-y-6">
             <h3 className="font-bold text-lg border-b pb-2 mb-4">بيانات صك الملكية</h3>
+
             <div className="grid grid-cols-1 gap-4">
-              <InputField label="رقم الصك" placeholder="" value={form.deedNumber} onChange={(e) => updateForm("deedNumber", e.target.value)} />
-              <InputField label="رقم المخطط" placeholder="" value={form.planNumber} onChange={(e) => updateForm("planNumber", e.target.value)} />
-              <InputField label="رقم القطعة" placeholder="" value={form.plotNumber} onChange={(e) => updateForm("plotNumber", e.target.value)} />
+
+              {/* رقم الصك — numbers only, 10 digits */}
+              <div className="space-y-1.5">
+                <label className="text-base font-bold text-[#30364F]">
+                  رقم الصك <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  maxLength={10}
+                  value={form.deedNumber}
+                  onChange={(e) => updateForm("deedNumber", e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
+                  placeholder="أدخل رقم الصك (أرقام فقط)"
+                  className="w-full border border-slate-300 px-4 py-3 text-base text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all placeholder:text-slate-400"
+                />
+                <p className="text-[13px] text-slate-400">رقم الصك مكون من أرقام فقط</p>
+              </div>
+
+              {/* رقم المخطط */}
+              <div className="space-y-1.5">
+                <label className="text-base font-bold text-[#30364F]">
+                  رقم المخطط
+                </label>
+
+                <input
+                  type="text"
+                  value={form.planNumber}
+                  onChange={(e) =>
+                    updateForm("planNumber", e.target.value)
+                  }
+                  placeholder="أدخل رقم المخطط"
+                  className="w-full border border-slate-300 px-4 py-3 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+              {/* رقم القطعة */}
+              <div className="space-y-1.5">
+                <label className="text-base font-bold text-[#30364F]">
+                  رقم القطعة
+                </label>
+
+                <input
+                  type="text"
+                  value={form.plotNumber}
+                  onChange={(e) =>
+                    updateForm("plotNumber", e.target.value)
+                  }
+                  placeholder="أدخل رقم القطعة"
+                  className="w-full border border-slate-300 px-4 py-3 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all placeholder:text-slate-400"
+                />
+              </div>
+
             </div>
 
+            {/* تفاصيل المزاد */}
             <div>
-              <h4 className="font-bold text-sm text-[#30364F] mb-4 pt-2 border-t">تفاصيل المزاد</h4>
+              <h4 className="font-bold text-lg text-[#30364F] mb-4 pt-2">
+                تفاصيل المزاد
+              </h4>
+
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <InputField label="اسم المزاد" placeholder="" value={form.auctionName} onChange={(e) => updateForm("auctionName", e.target.value)} />
-                  <InputField label="السعر الافتتاحي (ريال)" placeholder="0" type="number" value={form.startPrice} onChange={(e) => updateForm("startPrice", e.target.value)} />
+
+                {/* اسم المزاد */}
+                <div className="space-y-1.5">
+                  <label className="text-base font-bold text-[#30364F]">
+                    اسم المزاد
+                  </label>
+
+                  <input
+                    type="text"
+                    placeholder="مثال: مزاد فيلا حي الروضة"
+                    value={form.auctionName}
+                    onChange={(e) => updateForm("auctionName", e.target.value)}
+                    className="w-full border border-slate-300 px-4 py-3 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all placeholder:text-slate-400"
+                  />
                 </div>
-                <DateTimeField label="بداية المزاد" dateValue={startDate} timeValue={startTime} onDateChange={setStartDate} onTimeChange={setStartTime} />
-                <DateTimeField label="نهاية المزاد" dateValue={endDate} timeValue={endTime} onDateChange={setEndDate} onTimeChange={setEndTime} />
+
+                {/* السعر الافتتاحي */}
+                <div className="space-y-1.5">
+                  <label className="text-base font-bold text-[#30364F]">
+                    السعر الافتتاحي (ريال)
+                    <span className="text-red-500">*</span>
+                  </label>
+
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="1"
+                      value={form.startPrice}
+                      onChange={(e) => {
+                        const val = e.target.value;
+
+                        if (Number(val) >= 0) {
+                          updateForm("startPrice", val);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "-" || e.key === "e") {
+                          e.preventDefault();
+                        }
+                      }}
+                      placeholder="0"
+                      className="w-full border border-slate-300 px-4 py-3 text-sm rounded-md focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] bg-white transition-all placeholder:text-slate-400"
+                    />
+
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">
+                      ر.س
+                    </span>
+                  </div>
+
+                  {form.startPrice && Number(form.startPrice) > 0 && (
+                    <p className="text-[14px] text-emerald-600 font-bold">
+                      {Number(form.startPrice).toLocaleString("en-US")} ريال سعودي
+                    </p>
+                  )}
+                </div>
+
+                {/* بداية المزاد */}
+                <div className="space-y-1.5">
+                  <label className="text-base font-bold text-[#30364F]">
+                    بداية المزاد
+                  </label>
+
+                  <DateTimeField
+                    label=""
+                    dateValue={startDate}
+                    timeValue={startTime}
+                    onDateChange={setStartDate}
+                    onTimeChange={setStartTime}
+                  />
+                </div>
+
+                {/* نهاية المزاد */}
+                <div className="space-y-1.5">
+                  <label className="text-base font-bold text-[#30364F]">
+                    نهاية المزاد
+                  </label>
+
+                  <DateTimeField
+                    label=""
+                    dateValue={endDate}
+                    timeValue={endTime}
+                    onDateChange={setEndDate}
+                    onTimeChange={setEndTime}
+                  />
+                </div>
+
               </div>
             </div>
-
             {/* AI target price */}
             <div className="space-y-1.5">
-              <label className="text-sm font-bold text-[#30364F]">
+              <label className="text-base font-bold text-[#30364F]">
                 السعر المستهدف (ريال)
-                <span className="mr-2 text-[10px] font-bold text-[#91C6BC] bg-white border border-[#91C6BC] px-2 py-0.5 rounded-full">اختياري</span>
+                <span className="mr-2 text-[14px] font-bold text-[#91C6BC] bg-white border border-[#91C6BC] px-2 py-0.5 rounded-full">اختياري</span>
               </label>
-              <p className="text-xs text-slate-400 mb-2">أدخل السعر الذي تريد تحقيقه، وسيقترح النموذج السعر المبدئي الأمثل ووقت النشر.</p>
+              <p className="text-sm text-slate-400 mb-2">أدخل السعر الذي تريد تحقيقه، وسيقترح النموذج السعر المبدئي الأمثل ووقت عرض المزاد.</p>
               <div className="flex gap-3 items-end">
-                <input type="number" placeholder="مثال: 1,000,000" value={targetPrice}
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="مثال: 1000000"
+                  value={targetPrice}
+                  onKeyDown={(e) => { if (e.key === "-" || e.key === "e") e.preventDefault(); }}
                   onChange={(e) => { setTargetPrice(e.target.value); setStrategyResult(null); setStrategyError(null); }}
-                  className="flex-1 border border-slate-300 px-4 py-2.5 text-sm rounded-md focus:border-[#91C6BC] focus:outline-none focus:ring-1 focus:ring-[#91C6BC] bg-white transition-all placeholder:text-slate-400" />
+                  className="flex-1 border border-slate-300 px-4 py-2.5 text-base text-sm rounded-md focus:border-[#91C6BC] focus:outline-none focus:ring-1 focus:ring-[#91C6BC] bg-white transition-all placeholder:text-slate-400"
+                />
                 <button onClick={fetchAuctionStrategy} disabled={strategyLoading || !targetPrice}
                   className="flex items-center gap-2 px-5 py-2.5 bg-[#30364F] hover:bg-[#1e2538] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md font-bold text-sm transition-colors whitespace-nowrap">
                   {strategyLoading
@@ -715,6 +1111,8 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
             )}
           </div>
         )}
+
+
 
         {/* ── Step 4 ── */}
         {step === 4 && (
@@ -761,4 +1159,5 @@ export default function AddAuctionPage({ onCancel, currentUser }: AddAuctionPage
         </div>
       )}
     </div>
-  );}
+  );
+}

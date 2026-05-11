@@ -6,7 +6,6 @@ import {
    Check, Phone, Mail,
 } from "lucide-react";
 import { FaqView } from './components/FaqView';
-import { WalletModalNew } from './components/WalletModalNew';
 import { motion, AnimatePresence } from "motion/react";
 import { ViewState } from "./types";
 import { Button } from "./components/ui/button";
@@ -65,7 +64,6 @@ const THEME = {
    navbarBg: "bg-[#213448]", // Deep Blue for navbar
    footerBg: "bg-[#213448]" // Deep Blue for footer
 };
-
 // --- UI Components ---
 const InputField = ({ label, placeholder, type = "text", value, onChange }: { label: string; placeholder: string; type?: string, value?: string, onChange?: (e: any) => void }) => (
    <div className="space-y-1.5">
@@ -79,7 +77,6 @@ const InputField = ({ label, placeholder, type = "text", value, onChange }: { la
       />
    </div>
 );
-
 
 // --- Side Panel (Strict Navigation Menu) ---
 const SidePanel = ({
@@ -160,6 +157,8 @@ const SidePanel = ({
    );
 };
 
+
+
 // 1. Add state at the top of Navbar — convert it to a function component
 const Navbar = ({
    onNavigate,
@@ -220,15 +219,20 @@ const Navbar = ({
 
             {/* Actions - RIGHT */}
             <div className="flex items-center gap-3 min-w-fit">
-               <button
-                  className="hidden md:flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/20 rounded-full hover:bg-white/20 transition-colors cursor-pointer"
-                  onClick={onOpenWallet}
-               >
-                  <Wallet className="w-4 h-4 text-white" />
-                  <span className="font-bold text-sm text-white">
-                     {isLoggedIn ? `${walletBalance.toLocaleString()} ر.س` : 'المحفظة'}
-                  </span>
-               </button>
+<button
+   type="button"
+   onClick={(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onOpenWallet();
+   }}
+   className="hidden md:flex items-center justify-center gap-2 px-5 py-2 bg-white/10 border border-white/20 rounded-full hover:bg-white/20 transition-colors cursor-pointer relative z-[9999]"
+>
+   <Wallet className="w-4 h-4 text-white pointer-events-none" />
+   <span className="font-bold text-sm text-white pointer-events-none">
+      {isLoggedIn ? `${walletBalance.toLocaleString()} ر.س` : 'المحفظة'}
+   </span>
+</button>
 
                {isLoggedIn ? (
                   <>
@@ -372,7 +376,7 @@ function FavoritesView({
                      />
                   ))}
                </div>
-            )  }       
+            )}
          </div>
       </motion.div>
    );
@@ -418,17 +422,15 @@ const Footer = () => (
 
 
 // --- Main App Container ---
-
 export default function App() {
    const [currentView, setCurrentView] = useState<ViewState>('home');
    const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
    const [authLoading, setAuthLoading] = useState(true); const [walletOpen, setWalletOpen] = useState(false);
-   const [walletBalance, setWalletBalance] = useState(45000);
+   const [walletBalance, setWalletBalance] = useState(0);
    const [participationOpen, setParticipationOpen] = useState(false);
    const [paidDepositAuctions, setPaidDepositAuctions] = useState<Set<string>>(new Set());
    const [favorites, setFavorites] = useState<string[]>([]);
 
-   // ── Load favorites from Supabase on login ──────────────────────────────────
    useEffect(() => {
       const loadFavorites = async () => {
          const { data: { user } } = await supabase.auth.getUser();
@@ -446,9 +448,14 @@ export default function App() {
    const [showLoginModal, setShowLoginModal] = useState(false);
    const [hasBankInfo, setHasBankInfo] = useState(false);
    const [selectedAuctionId, setSelectedAuctionId] = useState<string | null>(null);
+   const [selectedAuctionTargetPrice, setSelectedAuctionTargetPrice] = useState(0);
 
+const depositAmount =
+   selectedAuctionTargetPrice > 0
+      ? Math.ceil(selectedAuctionTargetPrice * 0.05)
+      : 50000;
    const isLoggedIn = !!currentUser;
-
+   console.log("isLoggedIn:", isLoggedIn, "currentUser:", currentUser);
    const userData = currentUser
       ? {
          name: currentUser.name,
@@ -468,6 +475,17 @@ export default function App() {
          try {
             const user = await authService.getCurrentUser();
             setCurrentUser(user);
+            if (user) {
+   const { data: profileData } = await supabase
+      .from("profiles")
+      .select("wallet_balance")
+      .eq("national_id", user.nationalId)
+      .single();
+
+   if (profileData?.wallet_balance !== undefined) {
+      setWalletBalance(Number(profileData.wallet_balance));
+   }
+}
          } catch (error) {
             console.error("Failed to load current user:", error);
          } finally {
@@ -546,21 +564,48 @@ export default function App() {
       setCurrentView(view);
    };
 
-   const handleRecharge = (amount: number) => {
-      setWalletBalance(b => b + amount);
-   };
+const handleRecharge = async (amount: number) => {
+   if (!currentUser) return;
 
-   const handleDepositPayment = () => {
-      // Deduct 5000 SAR deposit
-      if (walletBalance >= 5000) {
-         setWalletBalance(b => b - 5000);
-         if (selectedAuctionId) {
-            setPaidDepositAuctions(prev => new Set(prev).add(selectedAuctionId));
-         }
-         setParticipationOpen(false);
-         setCurrentView('live-bidding');
-      }
-   };
+   const newBalance = walletBalance + amount;
+
+   setWalletBalance(newBalance);
+
+   await supabase
+      .from("profiles")
+      .update({
+         wallet_balance: newBalance
+      })
+      .eq("national_id", currentUser.nationalId);
+
+};
+
+const handleDepositPayment = async () => {
+   if (!selectedAuctionId || !currentUser) return;
+
+   if (walletBalance < depositAmount) {
+      alert("رصيد المحفظة غير كافٍ");
+      return;
+   }
+
+   const newBalance = walletBalance - depositAmount;
+
+   setWalletBalance(newBalance);
+
+   await supabase
+      .from("profiles")
+      .update({
+         wallet_balance: newBalance
+      })
+      .eq("national_id", currentUser.nationalId);
+
+   setPaidDepositAuctions(prev =>
+      new Set(prev).add(selectedAuctionId)
+   );
+
+   setParticipationOpen(false);
+   setCurrentView("live-bidding");
+};
 
    const toggleFavorite = async (id: string) => {
       if (!isLoggedIn) {
@@ -619,7 +664,14 @@ export default function App() {
                currentView={currentView}
                isLoggedIn={isLoggedIn}
                walletBalance={walletBalance}
-               onOpenWallet={() => isLoggedIn ? navigate('wallet') : setShowLoginModal(true)}
+               onOpenWallet={() => {
+   if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+   }
+
+   setWalletOpen(true);
+}}
                onOpenSidePanel={() => setIsSidePanelOpen(true)}
             />
          )}
@@ -689,27 +741,47 @@ export default function App() {
                      isFavorite={isFavorite}
                   />
                )}
-
                {currentView === 'auction-detail' && (
                   <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
                      <AuctionDetailPage
+                        isLoggedIn={isLoggedIn}
                         onBack={() => navigate("auction-browse")}
-                        onParticipate={() => {
-                           if (selectedAuctionId && paidDepositAuctions.has(selectedAuctionId)) {
-                              setCurrentView('live-bidding');
-                           } else {
-                              setParticipationOpen(true);
-                           }
-                        }}
+onParticipate={async () => {
+   if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+   }
+
+   if (!selectedAuctionId) return;
+
+   if (paidDepositAuctions.has(selectedAuctionId)) {
+      setCurrentView("live-bidding");
+      return;
+   }
+
+const { data } = await supabase
+   .from("auction")
+   .select("target_price")
+   .eq("auction_id", Number(selectedAuctionId))
+   .single();
+
+const targetPrice = Number(
+   String(data?.target_price ?? "0").replace(/,/g, "")
+);
+
+setSelectedAuctionTargetPrice(targetPrice);
+
+setParticipationOpen(true);
+}}
                         isFavorite={selectedAuctionId ? isFavorite(selectedAuctionId) : false}
                         onToggleFavorite={() => {
                            if (selectedAuctionId) toggleFavorite(selectedAuctionId);
                         }}
                         selectedAuctionId={selectedAuctionId}
+                        
                      />
                   </motion.div>
                )}
-
                {currentView === "live-bidding" && (
                   <LiveBiddingPage
                      auctionId={Number(selectedAuctionId)}
@@ -749,23 +821,22 @@ export default function App() {
          {currentView !== 'login' && currentView !== 'live-bidding' && <Footer />}
 
          {/* Modals */}
-         {walletOpen && (
-            <WalletModalNew
-               balance={walletBalance}
-               onClose={() => setWalletOpen(false)}
-               onRecharge={handleRecharge}
-               hasBankInfo={hasBankInfo}
-               onSaveBankInfo={() => setHasBankInfo(true)}
-            />
-         )}
+{walletOpen && (
+   <WalletModal
+      balance={walletBalance}
+      onClose={() => setWalletOpen(false)}
+      onRecharge={handleRecharge}
+   />
+)}
 
          {participationOpen && (
-            <ParticipationModal
-               isOpen={participationOpen}
-               onClose={() => setParticipationOpen(false)}
-               onConfirm={handleDepositPayment}
-               walletBalance={walletBalance}
-            />
+<ParticipationModal
+   isOpen={participationOpen}
+   onClose={() => setParticipationOpen(false)}
+   onConfirm={handleDepositPayment}
+   walletBalance={walletBalance}
+   depositAmount={depositAmount}
+/>
          )}
 
          <LoginRequiredModal
@@ -776,6 +847,7 @@ export default function App() {
                navigate("login");
             }}
          />
+
 
       </div>
    );

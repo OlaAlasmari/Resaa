@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart3, Info, Clock, Users, TrendingUp, Loader2, AlertCircle } from "lucide-react";
+import { Clock, Users, TrendingUp, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "../ui/button";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { supabase } from "../../../lib/supabase";
@@ -92,8 +92,7 @@ export default function LiveBiddingPage({ auctionId, onExit }: LiveBiddingPagePr
   const [error, setError]             = useState<string | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [selectedIncrement, setSelectedIncrement] = useState<number | null>(null);
-  const [currentUser, setCurrentUser] = useState<{ id: string; national_id: string; first_name: string } | null>(null);
-  const lastBidTimeRef = useRef<Date | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; national_id: string; first_name: string; is_frozen: boolean } | null>(null);  const lastBidTimeRef = useRef<Date | null>(null);
 
   // ── Load current user ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -102,7 +101,7 @@ export default function LiveBiddingPage({ auctionId, onExit }: LiveBiddingPagePr
       if (!user) return;
       const { data } = await supabase
         .from("profiles")
-        .select("id, national_id, first_name")
+        .select("id, national_id, first_name, is_frozen")
         .eq("id", user.id)
         .single();
       if (data) setCurrentUser(data);
@@ -195,10 +194,15 @@ export default function LiveBiddingPage({ auctionId, onExit }: LiveBiddingPagePr
 
   // ── Place bid ────────────────────────────────────────────────────────────────
   const placeBid = useCallback(async (incrementOrAmount?: number) => {
-    if (!auction || !currentUser) {
-      setError("يجب تسجيل الدخول أولاً");
-      return;
-    }
+   if (!auction || !currentUser) {
+  setError("يجب تسجيل الدخول أولاً");
+  return;
+}
+
+if (currentUser.is_frozen) {
+  setError("تم تجميد حسابك ولا يمكنك المزايدة");
+  return;
+}
 
     const minIncrement = auction.minimum_bid_increment ?? 1000;
     const bidAmount = incrementOrAmount
@@ -217,6 +221,18 @@ export default function LiveBiddingPage({ auctionId, onExit }: LiveBiddingPagePr
 
     setBidding(true);
     setError(null);
+    // ── Re-fetch frozen status in real time ───────────────────────
+    const { data: freshProfile } = await supabase
+      .from("profiles")
+      .select("is_frozen")
+      .eq("id", currentUser.id)
+      .single();
+
+    if (freshProfile?.is_frozen) {
+      setError("تم تجميد حسابك ولا يمكنك المزايدة");
+      setBidding(false);
+      return;
+    }
 
     try {
       // Calculate time since last bid
@@ -243,17 +259,13 @@ export default function LiveBiddingPage({ auctionId, onExit }: LiveBiddingPagePr
       const isMinIncrement = incrementAmount === minIncrement;
 
       // Insert bid into bids table
-      const { error: bidError } = await supabase.from("bids").insert({
-        auction_id:             auctionId,
-        user_id:                currentUser.id,
-        national_id:            currentUser.national_id,
-        amount:                 bidAmount,
-        bid_number:             bidNumber,
-        seconds_since_last_bid: secondsSinceLast,
-        increment_amount:       incrementAmount,
-        is_minimum_increment:   isMinIncrement,
-      });
-
+    const { error: bidError } = await supabase.from("bids").insert({
+  auction_id:  auctionId,
+  user_id:     currentUser.id,
+  national_id: currentUser.national_id,
+  amount:      bidAmount,
+  bid_number:  bidNumber,
+});
       if (bidError) throw new Error(bidError.message);
 
       // Update auction's highest_bid
@@ -263,6 +275,67 @@ export default function LiveBiddingPage({ auctionId, onExit }: LiveBiddingPagePr
         .eq("auction_id", auctionId);
 
       if (auctionError) throw new Error(auctionError.message);
+      
+// ── Fraud Detection ────────────────────────────────────────────
+      const auctionDuration =
+        (new Date(auction.end_time).getTime() - new Date(auction.start_time).getTime()) / 60000;
+      const firstBidTime = bids.length > 0
+        ? (new Date(bids[bids.length - 1].created_at).getTime() - new Date(auction.start_time).getTime()) / 60000
+        : 0;
+      const lastBidTime = (new Date(auction.end_time).getTime() - now.getTime()) / 60000;
+
+      const fraudPayload = {
+        total_auctions_participated:    10,
+        total_auctions_won:             2,
+        total_bids_history:             userBidCount ?? 1,
+        historical_win_rate:            0.2,
+        bids_to_wins_ratio:             (userBidCount ?? 1) / 1,
+        starting_price:                 auction.start_price,
+        final_price:                    bidAmount,
+        minimum_bid_increment:          minIncrement,
+        auction_duration_minutes:       auctionDuration,
+        number_of_unique_bidders:       uniqueBidders,
+        total_bids_in_auction:          totalBids ?? 1,
+        bids_count_in_auction:          (userBidCount ?? 0) + 1,
+        bid_share_in_auction:           ((userBidCount ?? 0) + 1) / ((totalBids ?? 1) + 1),
+        avg_seconds_between_bids:       secondsSinceLast ?? 30,
+        first_bid_time_from_start_minutes: firstBidTime,
+        last_bid_time_to_end_minutes:   lastBidTime,
+        used_minimum_increment_ratio:   isMinIncrement ? 1 : 0,
+        bid_increment_avg:              incrementAmount,
+      };
+
+      try {
+        const fraudRes  = await fetch("http://localhost:5000/detect-fraud", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify(fraudPayload),
+        });
+        const fraudData = await fraudRes.json();
+
+        if (fraudData.fraud) {
+          const { data: existingAlert } = await supabase
+            .from("fraud_alerts")
+            .select("alert_id")
+            .eq("auction_id", auctionId)
+            .eq("user_id", currentUser.id)
+            .single();
+
+          if (!existingAlert) {
+            await supabase.from("fraud_alerts").insert({
+              auction_id:  auctionId,
+              user_id:     currentUser.id,
+              national_id: currentUser.national_id,
+              risk_level:  fraudData.risk_level,
+              confidence:  fraudData.confidence,
+              reasons:     fraudData.reasons,
+              is_read:     false,
+            });
+          }
+        }
+      } catch (_) {
+        // fraud check failing should never block the bid
+      }
 
       lastBidTimeRef.current = now;
       setCustomAmount("");
@@ -315,202 +388,166 @@ export default function LiveBiddingPage({ auctionId, onExit }: LiveBiddingPagePr
           </Button>
         </div>
       </div>
+<div className="max-w-6xl mx-auto p-6">
+        <div className="grid md:grid-cols-12 gap-6 items-start">
 
-      <div className="max-w-6xl mx-auto p-6 grid md:grid-cols-12 gap-6">
+          {/* ── Left: image + property info ── */}
+          <div className="md:col-span-8 flex flex-col gap-4">
 
-        {/* ── Left: image + stats + analysis ── */}
-        <div className="md:col-span-8 space-y-6">
-
-          {/* Property image with current bid overlay */}
-          <div className="aspect-[16/7] bg-black rounded-xl overflow-hidden relative shadow-lg">
-            <ImageWithFallback
-              src={auction.property?.image_url?.trim() || getFallbackImage(auction.property?.property_type)}
-              className="w-full h-full object-cover opacity-90"
-              alt="Live"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-            <div className="absolute bottom-6 right-6">
-              <div className="text-sm text-slate-200 mb-1 font-bold drop-shadow-md">السعر الحالي</div>
-              <div className="text-5xl font-black text-white drop-shadow-lg">
-                {auction.highest_bid.toLocaleString()} ر.س
+            {/* Property image */}
+            <div className="aspect-[16/9] bg-black rounded-2xl overflow-hidden relative shadow-lg">
+              <ImageWithFallback
+                src={auction.property?.image_url?.trim() || getFallbackImage(auction.property?.property_type)}
+                className="w-full h-full object-cover opacity-90"
+                alt="Live"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+              <div className="absolute bottom-6 right-6">
+                <div className="text-sm text-slate-300 mb-1 font-bold drop-shadow-md">السعر الحالي</div>
+                <div className="text-5xl font-black text-white drop-shadow-lg">
+                  {auction.highest_bid.toLocaleString()} ر.س
+                </div>
+              </div>
+              <div className="absolute top-4 left-4 flex gap-2">
+                <div className="bg-black/50 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 font-bold">
+                  <Users className="w-3 h-3" /> {uniqueBidders} مزايد
+                </div>
+                <div className="bg-black/50 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 font-bold">
+                  <TrendingUp className="w-3 h-3" /> {bids.length} مزايدة
+                </div>
               </div>
             </div>
-            {/* Stats chips */}
-            <div className="absolute top-4 left-4 flex gap-2">
-              <div className="bg-black/50 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 font-bold">
-                <Users className="w-3 h-3" /> {uniqueBidders} مزايد
-              </div>
-              <div className="bg-black/50 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 font-bold">
-                <TrendingUp className="w-3 h-3" /> {bids.length} مزايدة
+
+            {/* Property info bar */}
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+              <div className="grid grid-cols-5 divide-x divide-x-reverse divide-slate-100 text-center">
+                <div className="px-3">
+                  <span className="text-[11px] text-slate-400 font-bold block mb-1">نوع العقار</span>
+                  <span className="font-black text-[#30364F] text-sm">{auction.property?.property_type ?? "—"}</span>
+                </div>
+                <div className="px-3">
+                  <span className="text-[11px] text-slate-400 font-bold block mb-1">المدينة</span>
+                  <span className="font-black text-[#30364F] text-sm">{auction.property?.city ?? "—"}</span>
+                </div>
+                <div className="px-3">
+                  <span className="text-[11px] text-slate-400 font-bold block mb-1">الحي</span>
+                  <span className="font-black text-[#30364F] text-sm">{auction.property?.district ?? "—"}</span>
+                </div>
+                <div className="px-3">
+                  <span className="text-[11px] text-slate-400 font-bold block mb-1">السعر الابتدائي</span>
+                  <span className="font-black text-[#30364F] text-sm">{auction.start_price.toLocaleString()} ر.س</span>
+                </div>
+                <div className="px-3">
+                  <span className="text-[11px] text-slate-400 font-bold block mb-1">أدنى زيادة</span>
+                  <span className="font-black text-[#30364F] text-sm">{minIncrement.toLocaleString()} ر.س</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Property info bar */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 flex flex-wrap gap-6 text-sm">
-            <div>
-              <span className="text-xs text-slate-400 font-bold block mb-0.5">نوع العقار</span>
-              <span className="font-bold text-[#30364F]">{auction.property?.property_type ?? "—"}</span>
-            </div>
-            <div>
-              <span className="text-xs text-slate-400 font-bold block mb-0.5">المدينة</span>
-              <span className="font-bold text-[#30364F]">{auction.property?.city ?? "—"}</span>
-            </div>
-            <div>
-              <span className="text-xs text-slate-400 font-bold block mb-0.5">الحي</span>
-              <span className="font-bold text-[#30364F]">{auction.property?.district ?? "—"}</span>
-            </div>
-            <div>
-              <span className="text-xs text-slate-400 font-bold block mb-0.5">السعر الابتدائي</span>
-              <span className="font-bold text-[#30364F]">{auction.start_price.toLocaleString()} ر.س</span>
-            </div>
-            <div>
-              <span className="text-xs text-slate-400 font-bold block mb-0.5">أدنى زيادة</span>
-              <span className="font-bold text-[#30364F]">{minIncrement.toLocaleString()} ر.س</span>
-            </div>
-          </div>
+          {/* ── Right: live bids + bid input ── */}
+          <div className="md:col-span-4">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col" style={{ height: "calc(9/16 * (100vw - 3rem) * 8/12 + 88px)" }}>
 
-          {/* Analysis panel — kept from original design */}
-          <div className="bg-white rounded-xl p-6 border border-emerald-100 relative overflow-hidden shadow-md">
-            <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
-              <BarChart3 className="w-24 h-24 text-[#30364F]" />
-            </div>
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-4 text-[#30364F] font-bold">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                <span>تحليل العقار للمزايدة</span>
-              </div>
-              <div className="grid grid-cols-2 gap-8 mb-4">
-                <div>
-                  <div className="text-xs text-slate-500 mb-1 font-bold">الحد الأقصى المقترح للمزايدة</div>
-                  <div className="text-3xl font-black text-[#30364F]">
-                    {Math.round(auction.start_price * 1.3).toLocaleString()} ر.س
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-slate-500 mb-1 font-bold">حالة السعر</div>
-                  <div className={`text-lg font-bold ${
-                    auction.highest_bid < auction.start_price * 1.1 ? "text-emerald-600" :
-                    auction.highest_bid < auction.start_price * 1.25 ? "text-amber-500" : "text-red-500"
-                  }`}>
-                    {auction.highest_bid < auction.start_price * 1.1 ? "مناسب للشراء" :
-                     auction.highest_bid < auction.start_price * 1.25 ? "يقترب من الحد" : "يتجاوز القيمة"}
-                  </div>
+              {/* Live bid list */}
+              <div className="p-4 border-b border-slate-100">
+                <div className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                  المزايدات الحية
                 </div>
               </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
-                <div
-                  className="h-full bg-gradient-to-l from-emerald-500 to-emerald-700 transition-all duration-500"
-                  style={{ width: `${Math.min(100, ((auction.highest_bid - auction.start_price) / (auction.start_price * 0.3)) * 100)}%` }}
-                />
-              </div>
-              <p className="text-sm text-slate-500 flex items-start gap-2">
-                <Info className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
-                <span>السعر الحالي بالنسبة للسعر الابتدائي. ننصح بزيادات حذرة لا تتجاوز {(minIncrement * 10).toLocaleString()} ر.س في المرة الواحدة.</span>
-              </p>
-            </div>
-          </div>
-        </div>
 
-        {/* ── Right: live bids + bid input ── */}
-        <div className="md:col-span-4 flex flex-col gap-4">
-
-          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col h-[600px] shadow-sm">
-
-            {/* Live bid list */}
-            <div className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-              المزايدات الحية
-            </div>
-            <div className="flex-1 space-y-2 overflow-y-auto mb-4 pr-1">
-              {bids.length === 0 ? (
-                <div className="text-center text-slate-400 text-sm py-8">لا توجد مزايدات بعد</div>
-              ) : bids.map((bid, idx) => (
-                <div
-                  key={bid.bid_id}
-                  className={`flex justify-between items-center text-sm p-3 rounded border transition-all ${
-                    idx === 0
-                      ? "bg-emerald-50 border-emerald-200 shadow-sm"
-                      : "bg-slate-50 border-slate-100"
-                  }`}
-                >
-                  <div>
-                    <span className="font-bold text-slate-700 block text-xs">
-                      {bid.profiles
-                        ? `${bid.profiles.first_name} ${bid.profiles.last_name ?? ""}`.trim()
-                        : `مزايد ${bid.national_id?.slice(-4) ?? "—"}`}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {new Date(bid.created_at).toLocaleTimeString("ar-SA")}
-                    </span>
-                  </div>
-                  <span className={`font-mono font-black ${idx === 0 ? "text-emerald-600" : "text-[#30364F]"}`}>
-                    {bid.amount.toLocaleString()} ر.س
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Error message */}
-            {error && (
-              <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-medium">
-                {error}
-              </div>
-            )}
-
-            {/* Bid input + buttons */}
-            <div className="space-y-3 pt-4 border-t border-slate-100">
-
-              {/* Quick increment buttons */}
-              <div className="grid grid-cols-3 gap-2">
-                {increments.map((inc) => (
-                  <button
-                    key={inc}
-                    onClick={() => { setSelectedIncrement(inc); setCustomAmount(""); }}
-                    disabled={bidding}
-                    className={`py-2 border rounded text-xs font-bold transition-all ${
-                      selectedIncrement === inc
-                        ? "bg-[#30364F] text-white border-[#30364F]"
-                        : "bg-white border-slate-200 text-[#30364F] hover:bg-slate-50"
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {bids.length === 0 ? (
+                  <div className="text-center text-slate-400 text-sm py-8">لا توجد مزايدات بعد</div>
+                ) : bids.map((bid, idx) => (
+                  <div
+                    key={bid.bid_id}
+                    className={`flex justify-between items-center text-sm p-3 rounded-xl border transition-all ${
+                      idx === 0
+                        ? "bg-emerald-50 border-emerald-200 shadow-sm"
+                        : "bg-slate-50 border-slate-100"
                     }`}
                   >
-                    +{(inc / 1000).toFixed(0)}k
-                  </button>
+                    <div>
+                      <span className="font-bold text-slate-700 block text-xs">
+                        {bid.profiles
+                          ? `${bid.profiles.first_name} ${bid.profiles.last_name ?? ""}`.trim()
+                          : `مزايد ${bid.national_id?.slice(-4) ?? "—"}`}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(bid.created_at).toLocaleTimeString("ar-SA")}
+                      </span>
+                    </div>
+                    <span className={`font-mono font-black ${idx === 0 ? "text-emerald-600" : "text-[#30364F]"}`}>
+                      {bid.amount.toLocaleString()} ر.س
+                    </span>
+                  </div>
                 ))}
               </div>
 
-              {/* Custom amount input */}
-              <input
-                type="number"
-                placeholder={`أدخل مبلغ المزايدة (أعلى من ${auction.highest_bid.toLocaleString()})`}
-                value={customAmount}
-                onChange={(e) => { setCustomAmount(e.target.value); setSelectedIncrement(null); }}
-                className="w-full border border-slate-300 px-3 py-2 text-sm rounded-lg focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] placeholder:text-slate-400"
-              />
+              {/* Bid controls */}
+              <div className="p-4 border-t border-slate-100 space-y-3">
 
-              {/* Selected amount preview */}
-              {(selectedIncrement || customAmount) && (
-                <div className="text-center text-xs text-slate-500">
-                  مزايدة بـ:{" "}
-                  <span className="font-black text-[#30364F]">
-                    {selectedIncrement
-                      ? (auction.highest_bid + selectedIncrement).toLocaleString()
-                      : Number(customAmount).toLocaleString()
-                    } ر.س
-                  </span>
+                {/* Quick increment buttons */}
+                <div className="grid grid-cols-3 gap-2">
+                  {increments.map((inc) => (
+                    <button
+                      key={inc}
+                      onClick={() => { setSelectedIncrement(inc); setCustomAmount(""); }}
+                      disabled={bidding}
+                      className={`py-2.5 border rounded-xl text-xs font-bold transition-all ${
+                        selectedIncrement === inc
+                          ? "bg-[#30364F] text-white border-[#30364F]"
+                          : "bg-white border-slate-200 text-[#30364F] hover:bg-slate-50"
+                      }`}
+                    >
+                      +{(inc / 1000).toFixed(0)}k
+                    </button>
+                  ))}
                 </div>
-              )}
 
-              <Button
-                fullWidth
-                className="!bg-emerald-600 hover:!bg-emerald-500 text-lg shadow-lg shadow-emerald-200"
-                onClick={() => selectedIncrement ? placeBid(selectedIncrement) : placeBid()}
-                disabled={bidding || (!selectedIncrement && !customAmount)}
-              >
-                {bidding ? <><Loader2 className="w-4 h-4 animate-spin ml-2" /> جاري المزايدة...</> : "مزايدة"}
-              </Button>
+                {/* Custom amount input */}
+                <input
+                  type="number"
+                  placeholder={`أعلى من ${auction.highest_bid.toLocaleString()}`}
+                  value={customAmount}
+                  onChange={(e) => { setCustomAmount(e.target.value); setSelectedIncrement(null); }}
+                  className="w-full border border-slate-300 px-3 py-2.5 text-sm rounded-xl focus:border-[#30364F] focus:outline-none focus:ring-1 focus:ring-[#30364F] placeholder:text-slate-400"
+                />
+
+                {/* Selected amount preview */}
+                {(selectedIncrement || customAmount) && (
+                  <div className="text-center text-xs text-slate-500">
+                    مزايدة بـ:{" "}
+                    <span className="font-black text-[#30364F]">
+                      {selectedIncrement
+                        ? (auction.highest_bid + selectedIncrement).toLocaleString()
+                        : Number(customAmount).toLocaleString()
+                      } ر.س
+                    </span>
+                  </div>
+                )}
+
+                {/* Error message */}
+                {error && (
+                  <div className="p-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium">
+                    {error}
+                  </div>
+                )}
+
+                <Button
+                  fullWidth
+                  className="!bg-emerald-600 hover:!bg-emerald-500 text-base shadow-lg shadow-emerald-200"
+                  onClick={() => selectedIncrement ? placeBid(selectedIncrement) : placeBid()}
+                  disabled={bidding || (!selectedIncrement && !customAmount)}
+                >
+                  {bidding ? <><Loader2 className="w-4 h-4 animate-spin ml-2" /> جاري المزايدة...</> : "مزايدة"}
+                </Button>
+              </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>

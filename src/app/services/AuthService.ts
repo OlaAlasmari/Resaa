@@ -267,16 +267,18 @@ class AuthService {
   }
   
   async forgotPassword(email: string): Promise<void> {
-  if (!email.trim()) {
-    throw new Error("البريد الإلكتروني مطلوب")
+  const cleanEmail = email.trim().toLowerCase();
+
+  if (!cleanEmail) {
+    throw new Error("البريد الإلكتروني مطلوب");
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: `${window.location.origin}/reset-password`,
-  })
+  const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+    redirectTo: `${window.location.origin}/RESAA/reset-password`,
+  });
 
   if (error) {
-    throw new Error("تعذر إرسال رابط إعادة تعيين كلمة المرور")
+    throw new Error("تعذر إرسال رابط إعادة تعيين كلمة المرور");
   }
 }
 }
